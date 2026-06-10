@@ -239,10 +239,7 @@ class AdaptiveMarketMaker:
         Falls back to 0.0 on error.
         """
         try:
-            resp = self.client._get(
-                "/api/v1/futures/market/get_funding_rate",
-                {"symbol": self.cfg.symbol},
-            )
+            resp = self.client.get_funding_rate(self.cfg.symbol)
             rate_str = (
                 resp.get("data", {}).get("fundingRate")
                 or resp.get("data", {}).get("lastFundingRate")

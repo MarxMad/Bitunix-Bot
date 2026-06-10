@@ -21,6 +21,7 @@ import threading
 from typing import Optional, List, Set
 from datetime import datetime
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -40,8 +41,8 @@ logger = logging.getLogger("bot_server")
 
 # ─── Load environment ──────────────────────────────────────────────────────────
 load_dotenv()
-API_KEY    = os.getenv("BITUNIX_API_KEY", "")
-SECRET_KEY = os.getenv("BITUNIX_SECRET_KEY", "")
+API_KEY    = os.getenv("BITUNIX_API_KEY", os.getenv("API_KEY", ""))
+SECRET_KEY = os.getenv("BITUNIX_SECRET_KEY", os.getenv("SECRET_KEY", ""))
 
 # ─── Shared state ─────────────────────────────────────────────────────────────
 # This dict is written by the bot thread and read by the WebSocket broadcaster.
@@ -332,6 +333,14 @@ class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMak
             self._sl_count += 1
         return triggered
 
+    def setup(self):
+        # Resolve to Adaptive's setup to correctly configure and log adaptive settings
+        AdaptiveMarketMaker.setup(self)
+
+    def _compute_order_prices(self, mid: float, spread_pct: float) -> tuple[float, float]:
+        # Resolve to Adaptive's price computation that accepts spread_pct
+        return AdaptiveMarketMaker._compute_order_prices(self, mid, spread_pct)
+
     def step(self):
         """Override step using Adaptive's checks but with fill detection and state updates."""
         mid = self._get_mid_price()
@@ -404,7 +413,16 @@ class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMak
 
 # ─── FastAPI app ──────────────────────────────────────────────────────────────
 
-app = FastAPI(title="Bitunix Market Maker Dashboard", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("🌐 Bitunix Dashboard Server started — http://localhost:8000")
+    logger.info("   Dashboard: open dashboard/index.html in your browser")
+    yield
+    _stop_event.set()
+    logger.info("Server shutting down, bot stop signal sent.")
+
+
+app = FastAPI(title="Bitunix Market Maker Dashboard", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -550,14 +568,9 @@ async def websocket_endpoint(ws: WebSocket):
 
 
 # ─── Startup / Shutdown events ────────────────────────────────────────────────
-
-@app.on_event("startup")
-async def on_startup():
-    logger.info("🌐 Bitunix Dashboard Server started — http://localhost:8000")
-    logger.info("   Dashboard: open dashboard/index.html in your browser")
+# Handled via lifespan context manager during FastAPI app instantiation.
 
 
-@app.on_event("shutdown")
-async def on_shutdown():
-    _stop_event.set()
-    logger.info("Server shutting down, bot stop signal sent.")
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("bot_server:app", host="0.0.0.0", port=8000, reload=True)

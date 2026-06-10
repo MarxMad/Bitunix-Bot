@@ -141,11 +141,15 @@ class BitunixClient:
 
     def get_kline(self, symbol: str, granularity: str = "1m", limit: int = 100) -> dict:
         """Get K-line / candlestick data."""
-        params = {"symbol": symbol, "granularity": granularity, "limit": limit}
+        params = {"symbol": symbol, "interval": granularity, "limit": limit}
         resp = self.session.get(BASE_URL + "/api/v1/futures/market/kline",
                                 params=params, timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
+
+    def get_funding_rate(self, symbol: str) -> dict:
+        """Get current perpetual funding rate."""
+        return self._get("/api/v1/futures/market/funding_rate", {"symbol": symbol})
 
     # ─── Account Endpoints ────────────────────────────────────────────────────
 
@@ -176,7 +180,8 @@ class BitunixClient:
                     qty: str, price: Optional[str] = None,
                     reduce_only: bool = False,
                     time_in_force: str = "GTC",
-                    client_id: Optional[str] = None) -> dict:
+                    client_id: Optional[str] = None,
+                    trade_side: str = "OPEN") -> dict:
         """
         Place a single order.
         side: BUY | SELL
@@ -191,6 +196,7 @@ class BitunixClient:
             "qty": str(qty),
             "reduceOnly": reduce_only,
             "timeInForce": time_in_force,
+            "tradeSide": trade_side,
         }
         if price:
             body["price"] = str(price)
