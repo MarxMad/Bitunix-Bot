@@ -26,8 +26,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from colorama import init, Fore, Style
 
-from bitunix_client import BitunixClient
 from strategy_market_maker import MarketMaker, MarketMakerConfig
+from strategy_adaptive import AdaptiveMarketMaker, AdaptiveConfig
 
 # ─── Coloured logging ─────────────────────────────────────────────────────────
 
@@ -100,6 +100,7 @@ def parse_args():
     parser.add_argument("--drift",         default=0.002,       type=float, help="Price drift %% to trigger order refresh")
     parser.add_argument("--log-level",     default="INFO",      help="Log level: DEBUG, INFO, WARNING, ERROR")
     parser.add_argument("--dry-run",       action="store_true", help="Dry run: fetch market data but do NOT place orders")
+    parser.add_argument("--adaptive",      action="store_true", help="Use adaptive market making strategy with optimizations")
     return parser.parse_args()
 
 
@@ -201,7 +202,25 @@ def main():
         return
 
     # Run the market maker
-    mm = MarketMaker(client, cfg)
+    if args.adaptive:
+        log.info("🚀 Using ADAPTIVE Market Making Strategy with all 5 optimizations enabled.")
+        cfg_adaptive = AdaptiveConfig(
+            symbol=args.symbol,
+            spread_pct=args.spread,
+            base_spread_pct=args.spread,
+            order_qty=args.qty,
+            max_position_qty=args.max_pos,
+            stop_loss_pct=args.stop_loss,
+            max_total_loss_usdt=args.max_loss,
+            refresh_interval=args.refresh,
+            price_drift_threshold_pct=args.drift,
+            leverage=args.leverage,
+        )
+        mm = AdaptiveMarketMaker(client, cfg_adaptive)
+    else:
+        log.info("Using STANDARD Market Making Strategy.")
+        mm = MarketMaker(client, cfg)
+
     try:
         mm.run()
     except KeyboardInterrupt:

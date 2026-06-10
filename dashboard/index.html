@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitunix Futures Market Maker — Dashboard</title>
+    <!-- Outfit Font from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #07070c;
+            --bg-gradient: radial-gradient(circle at 50% 50%, #121026 0%, #07070c 80%);
+            --card-bg: rgba(15, 15, 25, 0.55);
+            --card-border: rgba(255, 255, 255, 0.06);
+            --card-border-focus: rgba(255, 255, 255, 0.15);
+            --text: #f1f5f9;
+            --text-muted: #64748b;
+            --text-dark: #475569;
+            
+            --primary: #00ff88;
+            --primary-glow: rgba(0, 255, 136, 0.35);
+            --primary-bg: rgba(0, 255, 136, 0.08);
+
+            --secondary: #ff6b35;
+            --secondary-glow: rgba(255, 107, 53, 0.35);
+            --secondary-bg: rgba(255, 107, 53, 0.08);
+
+            --danger: #ff3366;
+            --danger-glow: rgba(255, 51, 102, 0.35);
+            --danger-bg: rgba(255, 51, 102, 0.08);
+
+            --info: #00f0ff;
+            --info-glow: rgba(0, 240, 255, 0.35);
+            --info-bg: rgba(0, 240, 255, 0.08);
+
+            --purple: #bd93f9;
+            --purple-glow: rgba(189, 147, 249, 0.35);
+            --purple-bg: rgba(189, 147, 249, 0.08);
+            
+            --glass-blur: blur(16px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-image: var(--bg-gradient);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Particles Background */
+        #particles-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Glassmorphism Card Style */
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-card:hover {
+            border-color: var(--card-border-focus);
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        /* Main Layout */
+        .container {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 10px 0 10px;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, var(--primary), var(--info));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--bg);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            animation: pulse-glow 3s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 15px rgba(0, 255, 136, 0.3); }
+            100% { box-shadow: 0 0 25px rgba(0, 240, 255, 0.6); }
+        }
+
+        .title-text h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            background: linear-gradient(90deg, #fff, var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .title-text p {
+            font-size: 11px;
+            color: var(--primary);
+            font-weight: 500;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            background: rgba(255,255,255,0.03);
+            padding: 8px 16px;
+            border-radius: 50px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--danger);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--danger-glow);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.connected {
+            background-color: var(--primary);
+            box-shadow: 0 0 12px var(--primary);
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Top Metrics Row */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .metric-card {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 4px;
+            width: 100%;
+        }
+
+        .metric-card.volume::before { background: var(--secondary); }
+        .metric-card.pnl::before { background: var(--primary); }
+        .metric-card.fills::before { background: var(--info); }
+        .metric-card.uptime::before { background: var(--purple); }
+
+        .metric-card.volume { box-shadow: inset 0 0 15px rgba(255,107,53,0.02); }
+        .metric-card.pnl.positive { box-shadow: inset 0 0 20px rgba(0,255,136,0.03); }
+        .metric-card.pnl.negative { box-shadow: inset 0 0 20px rgba(255,51,102,0.03); }
+
+        .metric-info h3 {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .metric-val {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .metric-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .metric-card.volume .metric-icon { background: var(--secondary-bg); color: var(--secondary); border: 1px solid rgba(255,107,53,0.1); }
+        .metric-card.pnl .metric-icon { background: var(--primary-bg); color: var(--primary); border: 1px solid rgba(0,255,136,0.1); }
+        .metric-card.pnl.negative .metric-icon { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(255,51,102,0.1); }
+        .metric-card.fills .metric-icon { background: var(--info-bg); color: var(--info); border: 1px solid rgba(0,240,255,0.1); }
+        .metric-card.uptime .metric-icon { background: var(--purple-bg); color: var(--purple); border: 1px solid rgba(189,147,249,0.1); }
+
+        /* Main Content Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Charts Columns */
+        .charts-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .chart-card {
+            height: 340px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .chart-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Right Column Cards */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Position status card */
+        .pos-card {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .pos-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pos-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .pos-side-badge {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-muted);
+        }
+
+        .pos-side-badge.long {
+            background: var(--primary-bg);
+            color: var(--primary);
+            border-color: rgba(0,255,136,0.2);
+            box-shadow: 0 0 10px rgba(0,255,136,0.1);
+        }
+
+        .pos-side-badge.short {
+            background: var(--danger-bg);
+            color: var(--danger);
+            border-color: rgba(255,51,102,0.2);
+            box-shadow: 0 0 10px rgba(255,51,102,0.1);
+        }
+
+        .pos-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .pos-item {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        .pos-item-lbl {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .pos-item-val {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .pos-item-val.pnl-green { color: var(--primary); }
+        .pos-item-val.pnl-red { color: var(--danger); }
+
+        /* Active Orders Card */
+        .orders-card {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-grow: 1;
+            min-height: 200px;
+        }
+
+        .orders-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .orders-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .orders-count {
+            background: rgba(255,255,255,0.05);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .orders-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            max-height: 250px;
+        }
+
+        .order-item {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .order-side {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .order-side.buy { background: var(--primary-bg); color: var(--primary); }
+        .order-side.sell { background: var(--danger-bg); color: var(--danger); }
+
+        .order-price {
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .order-qty {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .no-orders {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+            padding: 20px 0;
+            margin: auto 0;
+        }
+
+        /* Risk Metrics Card */
+        .risk-card {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .risk-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .risk-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .risk-label {
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .risk-val {
+            font-weight: 600;
+        }
+
+        .progress-bar-bg {
+            background: rgba(255,255,255,0.05);
+            height: 8px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.02);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 10px;
+            background: var(--info);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+            transition: width 0.5s cubic-bezier(0.1, 0.8, 0.2, 1);
+        }
+
+        .progress-bar-fill.warning {
+            background: var(--secondary);
+            box-shadow: 0 0 10px var(--secondary-glow);
+        }
+
+        .progress-bar-fill.danger {
+            background: var(--danger);
+            box-shadow: 0 0 10px var(--danger-glow);
+        }
+
+        /* Control Panel */
+        .control-panel {
+            display: grid;
+            grid-template-columns: 3fr 1.5fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .control-panel h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            letter-spacing: 0.5px;
+        }
+
+        .control-settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-group label {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-group select,
+        .input-group input {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-group select:focus,
+        .input-group input:focus {
+            border-color: rgba(0, 255, 136, 0.3);
+            background: rgba(255,255,255,0.06);
+        }
+
+        /* Toggles layout */
+        .opt-toggles-section {
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-top: 15px;
+            margin-top: 10px;
+        }
+
+        .opt-toggles-header {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .opt-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .toggle-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255,255,255,0.02);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .toggle-label {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Switch UI */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255,255,255,0.1);
+            transition: .3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #fff;
+            transition: .3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary);
+            box-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(16px);
+        }
+
+        /* Buttons control panel */
+        .buttons-row {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            flex-grow: 1;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-start {
+            background: var(--primary);
+            color: var(--bg);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+
+        .btn-start:hover {
+            background: #00e577;
+            box-shadow: 0 6px 20px rgba(0, 255, 136, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .btn-stop {
+            background: var(--danger);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3);
+        }
+
+        .btn-stop:hover {
+            background: #ff1a53;
+            box-shadow: 0 6px 20px rgba(255, 51, 102, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            background: var(--text-dark) !important;
+            color: var(--text-muted) !important;
+            box-shadow: none !important;
+            transform: none !important;
+            cursor: not-allowed;
+        }
+
+        /* Log console */
+        .console-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .console-wrapper {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #cbd5e1;
+            flex-grow: 1;
+            overflow-y: auto;
+            max-height: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .log-line {
+            white-space: pre-wrap;
+            border-left: 2px solid var(--text-dark);
+            padding-left: 8px;
+        }
+
+        .log-line.INFO { border-color: var(--primary); color: #e2e8f0; }
+        .log-line.WARNING { border-color: var(--secondary); color: #fde047; }
+        .log-line.ERROR { border-color: var(--danger); color: #fca5a5; }
+        .log-line.CRITICAL { border-color: var(--danger); background: var(--danger-bg); color: #fecaca; font-weight: 600; }
+
+        /* Adaptive Details Card */
+        .adaptive-info-card {
+            background: rgba(0,240,255,0.02);
+            border: 1px solid rgba(0,240,255,0.08);
+        }
+        
+        .adaptive-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .adaptive-badge {
+            background: var(--info-bg);
+            border: 1px solid rgba(0,240,255,0.15);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            color: var(--info);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Canvas particle background -->
+    <canvas id="particles-canvas"></canvas>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo-area">
+                <div class="logo-icon">⚡</div>
+                <div class="title-text">
+                    <h1>BITUNIX MARKET MAKER</h1>
+                    <p>FUTURES ALGORITHMIC TRADING BOT</p>
+                </div>
+            </div>
+            <div class="connection-status">
+                <div id="connection-dot" class="status-dot"></div>
+                <span id="connection-text">DESCONECTADO</span>
+            </div>
+        </header>
+
+        <!-- Top Metrics Row -->
+        <div class="metrics-row">
+            <!-- Metric 1: Volume -->
+            <div class="glass-card metric-card volume">
+                <div class="metric-info">
+                    <h3>Volumen de Sesión</h3>
+                    <div id="val-volume" class="metric-val">0.00</div>
+                </div>
+                <div class="metric-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+            </div>
+
+            <!-- Metric 2: Net PnL -->
+            <div id="card-pnl" class="glass-card metric-card pnl">
+                <div class="metric-info">
+                    <h3>PnL Realizado</h3>
+                    <div id="val-pnl" class="metric-val">0.00 USDT</div>
+                </div>
+                <div class="metric-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>
+                </div>
+            </div>
+
+            <!-- Metric 3: Fills -->
+            <div class="glass-card metric-card fills">
+                <div class="metric-info">
+                    <h3>Fills / R. Trips</h3>
+                    <div id="val-fills" class="metric-val">0 / 0</div>
+                </div>
+                <div class="metric-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </div>
+            </div>
+
+            <!-- Metric 4: Uptime -->
+            <div class="glass-card metric-card uptime">
+                <div class="metric-info">
+                    <h3>Tiempo de Uptime</h3>
+                    <div id="val-uptime" class="metric-val">00:00:00</div>
+                </div>
+                <div class="metric-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-grid">
+            <!-- Left: Charts -->
+            <div class="charts-container">
+                <!-- PnL Chart -->
+                <div class="glass-card chart-card">
+                    <div class="chart-header">
+                        <h2>Curva de PnL Acumulada</h2>
+                        <span id="chart-pnl-label" style="font-size: 13px; font-weight:600; color:var(--primary);">0.00%</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="pnl-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Volume Chart -->
+                <div class="glass-card chart-card">
+                    <div class="chart-header">
+                        <h2>Frecuencia de Volumen por Paso</h2>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="volume-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Status / Orders / Risks -->
+            <div class="right-column">
+                <!-- Position Status Card -->
+                <div class="glass-card pos-card">
+                    <div class="pos-header">
+                        <h2>Estado de la Posición</h2>
+                        <span id="pos-side" class="pos-side-badge">FLAT</span>
+                    </div>
+                    <div class="pos-grid">
+                        <div class="pos-item">
+                            <div class="pos-item-lbl">Tamaño</div>
+                            <div id="pos-size" class="pos-item-val">0.0000</div>
+                        </div>
+                        <div class="pos-item">
+                            <div class="pos-item-lbl">Precio de Entrada</div>
+                            <div id="pos-price" class="pos-item-val">0.00</div>
+                        </div>
+                        <div class="pos-item">
+                            <div class="pos-item-lbl">PnL No Realizado</div>
+                            <div id="pos-unreal-pnl" class="pos-item-val">0.00 USDT</div>
+                        </div>
+                        <div class="pos-item">
+                            <div class="pos-item-lbl">Margen Utilizado</div>
+                            <div id="pos-margin" class="pos-item-val">0.00 USDT</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Adaptive Stats detail (if adaptive enabled) -->
+                <div id="card-adaptive-details" class="glass-card pos-card adaptive-info-card" style="display: none;">
+                    <div class="pos-header">
+                        <h2>Optimización Adaptativa</h2>
+                        <span class="adaptive-badge">Activa</span>
+                    </div>
+                    <div class="adaptive-info-grid">
+                        <div class="pos-item">
+                            <div class="pos-item-lbl">Spread Dinámico</div>
+                            <div id="val-adaptive-spread" class="pos-item-val" style="color:var(--info);">0.0000%</div>
+                        </div>
+                        <div class="pos-item">
+                            <div class="pos-item-lbl">Racha SL / Fills</div>
+                            <div id="val-adaptive-streaks" class="pos-item-val">0 / 0</div>
+                        </div>
+                        <div class="pos-item">
+                            <div class="pos-item-lbl">Calidad Spread (Ratio)</div>
+                            <div id="val-adaptive-capture" class="pos-item-val">1.00</div>
+                        </div>
+                        <div class="pos-item">
+                            <div class="pos-item-lbl">En Enfriamiento</div>
+                            <div id="val-adaptive-cooldown" class="pos-item-val">NO</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pending Orders Card -->
+                <div class="glass-card orders-card">
+                    <div class="orders-header">
+                        <h2>Órdenes Activas en Libro</h2>
+                        <span id="orders-count" class="orders-count">0</span>
+                    </div>
+                    <div id="orders-list-container" class="orders-list">
+                        <!-- List loaded dynamically -->
+                        <div class="no-orders">No hay órdenes pendientes en Bitunix</div>
+                    </div>
+                </div>
+
+                <!-- Risk Meters Card -->
+                <div class="glass-card risk-card">
+                    <h2>Métricas de Riesgo</h2>
+                    <!-- Drawdown -->
+                    <div class="risk-item">
+                        <div class="risk-label-row">
+                            <span class="risk-label">Drawdown Máximo Permitido</span>
+                            <span id="lbl-risk-drawdown" class="risk-val">0.0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div id="bar-risk-drawdown" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <!-- Circuit Breaker -->
+                    <div class="risk-item">
+                        <div class="risk-label-row">
+                            <span class="risk-label">Circuit Breaker (Pérdida Límite)</span>
+                            <span id="lbl-risk-circuit" class="risk-val">0.0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div id="bar-risk-circuit" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel & Console -->
+        <div class="control-panel">
+            <!-- Left: Settings Form -->
+            <div class="glass-card">
+                <h2>Panel de Control</h2>
+                <form id="control-form" onsubmit="event.preventDefault();">
+                    <div class="control-settings-grid">
+                        <div class="input-group">
+                            <label for="input-symbol">Símbolo</label>
+                            <select id="input-symbol">
+                                <option value="BTCUSDT">BTCUSDT (Bitcoin)</option>
+                                <option value="ETHUSDT">ETHUSDT (Ethereum)</option>
+                                <option value="SOLUSDT">SOLUSDT (Solana)</option>
+                                <option value="DOGEUSDT">DOGEUSDT (Dogecoin)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="input-qty">Tamaño de Orden (Qty)</label>
+                            <input type="text" id="input-qty" value="0.001" placeholder="Ej: 0.001">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-leverage">Apalancamiento</label>
+                            <input type="number" id="input-leverage" min="1" max="20" value="5">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-spread">Spread Base (Frac.)</label>
+                            <input type="number" id="input-spread" step="0.0001" value="0.0004" placeholder="Ej: 0.0004">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-maxloss">Pérdida Max (USDT)</label>
+                            <input type="number" id="input-maxloss" value="10.0" step="0.5">
+                        </div>
+                    </div>
+
+                    <!-- Optimizations Switches -->
+                    <div class="opt-toggles-section">
+                        <div class="opt-toggles-header">
+                            <span>OPTIMIZACIONES ESTRATÉGICAS</span>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:11px;">MODO ADAPTATIVO</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="input-adaptive" checked onchange="toggleAdaptiveSubOptions(this.checked)">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="opt-sub-grid" class="opt-grid">
+                            <div class="toggle-item">
+                                <span class="toggle-label" title="Ensancha spread en alta volatilidad y ajusta según capture ratio">Spread Volatilidad</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="opt-vol" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="toggle-item">
+                                <span class="toggle-label" title="Incrementa órdenes hacia el lado que cobra funding rate">Sesgo Funding</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="opt-funding" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="toggle-item">
+                                <span class="toggle-label" title="Reduce tamaño un 50% después de 3 Stop-Losses seguidos">Anti-Martingala</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="opt-martingale" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="toggle-item">
+                                <span class="toggle-label" title="Reduce tamaño y ensancha spread en horas de baja liquidez">Awareness de Horario</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="opt-time" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="buttons-row">
+                        <button type="button" id="btn-start-bot" class="btn btn-start" onclick="startTradingBot()">Iniciar Bot</button>
+                        <button type="button" id="btn-stop-bot" class="btn btn-stop" disabled onclick="stopTradingBot()">Detener Bot</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Right: Log Console -->
+            <div class="glass-card console-card">
+                <h2>Terminal de Registro (Logs)</h2>
+                <div id="console-output" class="console-wrapper">
+                    <div style="color:var(--text-muted);">Iniciando consola... esperando conexión.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ─── Constants & State ───────────────────────────────────────────────
+        const wsUrl = "ws://localhost:8000/ws";
+        const apiUrl = "http://localhost:8000";
+        let ws = null;
+        let pnlChart = null;
+        let volumeChart = null;
+        let pnlHistory = [];
+        let volHistory = [];
+        let maxDataPoints = 100;
+
+        // ─── Canvas Star Particles ───────────────────────────────────────────
+        const canvas = document.getElementById('particles-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 1.5 + 0.5;
+                this.speedX = Math.random() * 0.15 - 0.075;
+                this.speedY = Math.random() * 0.05 + 0.02;
+                this.alpha = Math.random() * 0.5 + 0.2;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.y > canvas.height) {
+                    this.y = 0;
+                    this.x = Math.random() * canvas.width;
+                }
+                if (this.x > canvas.width || this.x < 0) {
+                    this.speedX = -this.speedX;
+                }
+            }
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            const count = Math.floor((canvas.width * canvas.height) / 10000);
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animateParticles);
+        }
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            initParticles();
+        });
+        resizeCanvas();
+        initParticles();
+        animateParticles();
+
+        // ─── Initialize Charts ───────────────────────────────────────────────
+        function initCharts() {
+            const pnlCtx = document.getElementById('pnl-chart').getContext('2d');
+            const volCtx = document.getElementById('volume-chart').getContext('2d');
+
+            // PnL Line Chart
+            pnlChart = new Chart(pnlCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'PnL Realizado (USDT)',
+                        data: [],
+                        borderColor: '#00ff88',
+                        borderWidth: 2,
+                        backgroundColor: 'rgba(0, 255, 136, 0.06)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#64748b', font: { family: 'Outfit' } }
+                        }
+                    }
+                }
+            });
+
+            // Volume Bar Chart
+            volumeChart = new Chart(volCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Volumen por Ciclo',
+                        data: [],
+                        backgroundColor: 'rgba(255, 107, 53, 0.75)',
+                        borderColor: '#ff6b35',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#64748b', font: { family: 'Outfit' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ─── WebSocket Connection ───────────────────────────────────────────
+        function connectWebSocket() {
+            const connDot = document.getElementById('connection-dot');
+            const connText = document.getElementById('connection-text');
+            const consoleOutput = document.getElementById('console-output');
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                connDot.classList.add('connected');
+                connText.innerText = "CONECTADO";
+                consoleOutput.innerHTML = `<div style="color:var(--primary);">WebSocket conectado exitosamente. Escuchando métricas...</div>`;
+                fetchConfig();
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                updateUI(data);
+            };
+
+            ws.onerror = (err) => {
+                console.error("WS error:", err);
+            };
+
+            ws.onclose = () => {
+                connDot.classList.remove('connected');
+                connText.innerText = "DESCONECTADO";
+                consoleOutput.innerHTML = `<div style="color:var(--danger);">WebSocket desconectado. Intentando reconectar en 3 segundos...</div>`;
+                // Disable stop buttons if connection drops
+                document.getElementById('btn-start-bot').disabled = false;
+                document.getElementById('btn-stop-bot').disabled = true;
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        // ─── Update UI on WebSocket message ─────────────────────────────────
+        let lastLoggedLines = "";
+        
+        function updateUI(data) {
+            // Smoothly update simple numbers
+            animateValue("val-volume", data.volume, 2);
+            
+            const pnlValEl = document.getElementById("val-pnl");
+            pnlValEl.innerText = `${data.pnl >= 0 ? '+' : ''}${data.pnl.toFixed(4)} USDT`;
+            const cardPnl = document.getElementById("card-pnl");
+            if (data.pnl >= 0) {
+                cardPnl.className = "glass-card metric-card pnl positive";
+                pnlValEl.style.color = "var(--primary)";
+                pnlChart.data.datasets[0].borderColor = '#00ff88';
+                pnlChart.data.datasets[0].backgroundColor = 'rgba(0, 255, 136, 0.06)';
+            } else {
+                cardPnl.className = "glass-card metric-card pnl negative";
+                pnlValEl.style.color = "var(--danger)";
+                pnlChart.data.datasets[0].borderColor = '#ff3366';
+                pnlChart.data.datasets[0].backgroundColor = 'rgba(255, 51, 102, 0.06)';
+            }
+
+            document.getElementById("val-fills").innerText = `${data.num_fills} / ${data.num_round_trips}`;
+            
+            // Format uptime
+            const uptime = data.uptime_seconds;
+            const hours = String(Math.floor(uptime / 3600)).padStart(2, '0');
+            const minutes = String(Math.floor((uptime % 3600) / 60)).padStart(2, '0');
+            const seconds = String(uptime % 60).padStart(2, '0');
+            document.getElementById("val-uptime").innerText = `${hours}:${minutes}:${seconds}`;
+
+            // Chart data updates
+            // Only push if value is different from last data point
+            const pnlData = pnlChart.data.datasets[0].data;
+            if (pnlData.length === 0 || pnlData[pnlData.length - 1] !== data.pnl) {
+                pnlData.push(data.pnl);
+                pnlChart.data.labels.push("");
+                if (pnlData.length > maxDataPoints) {
+                    pnlData.shift();
+                    pnlChart.data.labels.shift();
+                }
+                pnlChart.update();
+                document.getElementById("chart-pnl-label").innerText = `${data.pnl >= 0 ? '+' : ''}${data.pnl.toFixed(4)} USDT`;
+            }
+
+            const volData = volumeChart.data.datasets[0].data;
+            if (volData.length === 0 || data.volume > 0) {
+                // If it increases, compute the step difference
+                const lastVol = volData.length > 0 ? volHistory[volHistory.length - 1] : 0;
+                const diff = Math.max(0, data.volume - lastVol);
+                volHistory.push(data.volume);
+                volData.push(diff);
+                volumeChart.data.labels.push("");
+                if (volData.length > 30) {
+                    volData.shift();
+                    volHistory.shift();
+                    volumeChart.data.labels.shift();
+                }
+                volumeChart.update();
+            }
+
+            // Position card
+            const pos = data.position || {};
+            const posSideEl = document.getElementById("pos-side");
+            posSideEl.innerText = pos.side || "FLAT";
+            posSideEl.className = `pos-side-badge ${pos.side ? pos.side.toLowerCase() : 'flat'}`;
+
+            document.getElementById("pos-size").innerText = pos.qty ? pos.qty.toFixed(4) : "0.0000";
+            document.getElementById("pos-price").innerText = pos.entry_price ? pos.entry_price.toFixed(2) : "0.00";
+            
+            const unrealPnlEl = document.getElementById("pos-unreal-pnl");
+            const unrealPnl = pos.unrealized_pnl || 0.0;
+            unrealPnlEl.innerText = `${unrealPnl >= 0 ? '+' : ''}${unrealPnl.toFixed(4)} USDT`;
+            unrealPnlEl.className = `pos-item-val ${unrealPnl >= 0 ? 'pnl-green' : 'pnl-red'}`;
+
+            document.getElementById("pos-margin").innerText = pos.margin ? `${pos.margin.toFixed(2)} USDT` : "0.00 USDT";
+
+            // Adaptive details
+            const adaptInfo = data.adaptive_info || {};
+            const adCard = document.getElementById("card-adaptive-details");
+            if (adaptInfo.adaptive_mode) {
+                adCard.style.display = "flex";
+                document.getElementById("val-adaptive-spread").innerText = `${adaptInfo.spread_pct.toFixed(4)}%`;
+                document.getElementById("val-adaptive-streaks").innerText = `SL: ${adaptInfo.sl_streak} / F: ${adaptInfo.fill_streak}`;
+                document.getElementById("val-adaptive-capture").innerText = `${adaptInfo.avg_capture.toFixed(2)}x`;
+                document.getElementById("val-adaptive-cooldown").innerText = adaptInfo.in_cool_down ? "SÍ (50% Qty)" : "NO";
+                document.getElementById("val-adaptive-cooldown").style.color = adaptInfo.in_cool_down ? "var(--danger)" : "var(--primary)";
+            } else {
+                adCard.style.display = "none";
+            }
+
+            // Active orders
+            const orders = data.active_orders || [];
+            document.getElementById("orders-count").innerText = orders.length;
+            const ordersList = document.getElementById("orders-list-container");
+            
+            if (orders.length === 0) {
+                ordersList.innerHTML = `<div class="no-orders">No hay órdenes pendientes en Bitunix</div>`;
+            } else {
+                ordersList.innerHTML = orders.map(o => `
+                    <div class="order-item">
+                        <span class="order-side ${o.side.toLowerCase()}">${o.side}</span>
+                        <span class="order-price">${o.price.toFixed(2)}</span>
+                        <span class="order-qty">${o.qty} contrato(s)</span>
+                    </div>
+                `).join("");
+            }
+
+            // Risk progress bars
+            const drawdown = data.drawdown_pct || 0.0;
+            document.getElementById("lbl-risk-drawdown").innerText = `${drawdown.toFixed(1)}%`;
+            const barDrawdown = document.getElementById("bar-risk-drawdown");
+            barDrawdown.style.width = `${drawdown}%`;
+            setProgressBarColor(barDrawdown, drawdown);
+
+            const circuit = data.circuit_pct || 0.0;
+            document.getElementById("lbl-risk-circuit").innerText = `${circuit.toFixed(1)}%`;
+            const barCircuit = document.getElementById("bar-risk-circuit");
+            barCircuit.style.width = `${circuit}%`;
+            setProgressBarColor(barCircuit, circuit);
+
+            // Controls buttons toggling
+            const isRunning = data.is_running;
+            document.getElementById("btn-start-bot").disabled = isRunning;
+            document.getElementById("btn-stop-bot").disabled = !isRunning;
+
+            // Form inputs blocking
+            document.getElementById("input-symbol").disabled = isRunning;
+            document.getElementById("input-qty").disabled = isRunning;
+            document.getElementById("input-leverage").disabled = isRunning;
+            document.getElementById("input-spread").disabled = isRunning;
+            document.getElementById("input-maxloss").disabled = isRunning;
+            document.getElementById("input-adaptive").disabled = isRunning;
+            document.getElementById("opt-vol").disabled = isRunning;
+            document.getElementById("opt-funding").disabled = isRunning;
+            document.getElementById("opt-martingale").disabled = isRunning;
+            document.getElementById("opt-time").disabled = isRunning;
+
+            // Logs updating
+            const logLines = data.log_lines || [];
+            const serialized = logLines.join("\n");
+            if (serialized !== lastLoggedLines) {
+                lastLoggedLines = serialized;
+                const consoleOutput = document.getElementById("console-output");
+                consoleOutput.innerHTML = logLines.map(line => {
+                    let typeClass = "INFO";
+                    if (line.includes("[WARNING]")) typeClass = "WARNING";
+                    else if (line.includes("[ERROR]")) typeClass = "ERROR";
+                    else if (line.includes("[CRITICAL]") || line.includes("🚨") || line.includes("⚠️")) typeClass = "CRITICAL";
+                    return `<div class="log-line ${typeClass}">${escapeHtml(line)}</div>`;
+                }).join("");
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+        }
+
+        // ─── Control actions ────────────────────────────────────────────────
+        async function fetchConfig() {
+            try {
+                const res = await fetch(`${apiUrl}/config`);
+                const data = await res.json();
+                
+                document.getElementById("input-symbol").value = data.symbol;
+                document.getElementById("input-leverage").value = data.leverage;
+                document.getElementById("input-spread").value = data.spread;
+                document.getElementById("input-maxloss").value = data.max_loss;
+                
+                const isRunning = data.is_running;
+                document.getElementById("btn-start-bot").disabled = isRunning;
+                document.getElementById("btn-stop-bot").disabled = !isRunning;
+            } catch (err) {
+                console.error("Config fetch error:", err);
+            }
+        }
+
+        async function startTradingBot() {
+            const btn = document.getElementById("btn-start-bot");
+            btn.disabled = true;
+
+            const reqBody = {
+                symbol: document.getElementById("input-symbol").value,
+                qty: document.getElementById("input-qty").value,
+                leverage: parseInt(document.getElementById("input-leverage").value),
+                spread: parseFloat(document.getElementById("input-spread").value),
+                max_loss: parseFloat(document.getElementById("input-maxloss").value),
+                adaptive: document.getElementById("input-adaptive").checked,
+                vol_adaptive: document.getElementById("opt-vol").checked,
+                funding_bias: document.getElementById("opt-funding").checked,
+                anti_martingale: document.getElementById("opt-martingale").checked,
+                time_aware: document.getElementById("opt-time").checked,
+                spread_capture: document.getElementById("opt-vol").checked // maps to capture adjustments too
+            };
+
+            try {
+                const res = await fetch(`${apiUrl}/start`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(reqBody)
+                });
+                const response = await res.json();
+                if (response.ok) {
+                    console.log("Bot started successfully");
+                } else {
+                    alert("Error starting bot: " + response.detail);
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                alert("Connection failed to start bot");
+                btn.disabled = false;
+            }
+        }
+
+        async function stopTradingBot() {
+            document.getElementById("btn-stop-bot").disabled = true;
+            try {
+                const res = await fetch(`${apiUrl}/stop`, { method: "POST" });
+                const response = await res.json();
+                if (response.ok) {
+                    console.log("Bot stop request sent");
+                } else {
+                    alert("Error stopping bot: " + response.detail);
+                }
+            } catch (err) {
+                alert("Connection failed to stop bot");
+            }
+        }
+
+        function toggleAdaptiveSubOptions(checked) {
+            const items = document.querySelectorAll("#opt-sub-grid input[type=checkbox]");
+            items.forEach(item => {
+                item.checked = checked;
+                item.disabled = !checked;
+            });
+        }
+
+        // ─── Helpers ────────────────────────────────────────────────────────
+        function animateValue(id, value, decimals = 0) {
+            const obj = document.getElementById(id);
+            if (!obj) return;
+            const current = parseFloat(obj.innerText) || 0;
+            const target = parseFloat(value) || 0;
+            if (current === target) return;
+
+            const duration = 400; // ms
+            const start = performance.now();
+
+            function step(timestamp) {
+                const progress = Math.min((timestamp - start) / duration, 1);
+                const val = current + (target - current) * progress;
+                obj.innerText = val.toFixed(decimals);
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        function setProgressBarColor(bar, val) {
+            bar.classList.remove('warning', 'danger');
+            if (val >= 80) {
+                bar.classList.add('danger');
+            } else if (val >= 50) {
+                bar.classList.add('warning');
+            }
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        // Init everything
+        initCharts();
+        connectWebSocket();
+    </script>
+</body>
+</html>
