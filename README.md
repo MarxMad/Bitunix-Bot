@@ -95,8 +95,8 @@ tabulate==0.9.0         # Pretty tables in simulator
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/bitunix-bot.git
-cd bitunix-bot
+git clone https://github.com/MarxMad/Bitunix-Bot.git
+cd Bitunix-Bot
 pip install -r requirements.txt
 ```
 
@@ -124,18 +124,38 @@ python -X utf8 simulate.py --capital 50 --leverage 10 --hours 24
 python -X utf8 bot.py --dry-run --symbol BTCUSDT
 ```
 
-You should see:
-```
-✅ Market data OK | BTCUSDT last=61250.00
-✅ Account OK      | Available balance: XX.XX USDT
-[DRY] mid=61250.00 | book_spread=0.0002% | would_buy=61237.75 | would_sell=61262.25
-```
-
-### 5. Run the live bot
+### 5. Run the live standard bot
 
 ```bash
-python -X utf8 bot.py --symbol BTCUSDT --qty 0.001 --leverage 10 --max-loss 5.0
+python -X utf8 bot.py --symbol BTCUSDT --qty 0.001 --leverage 5 --max-loss 10.0
 ```
+
+### 6. Run the live ADAPTIVE bot (with 5 optimizations)
+
+To run the bot using the volatility-adaptive, funding rate bias, anti-martingale, and timing-aware parameters:
+
+```bash
+python -X utf8 bot.py --adaptive --symbol BTCUSDT --qty 0.001 --leverage 5 --max-loss 10.0
+```
+
+### 7. Run the Real-Time Web Dashboard
+
+Start the FastAPI backend server:
+```bash
+python -X utf8 bot_server.py
+```
+*This starts the API & WebSocket server on `http://localhost:8000`.*
+
+Now simply open the file [`dashboard/index.html`](file:///d:/Documentos/Bitunix-BOT/dashboard/index.html) in any web browser to view active metrics, positions, orders, live logs, and start/stop the bot in standard or adaptive mode.
+
+### 8. Run the Beginner's Puzzle Bot (Educational)
+
+To run the simple copy-paste puzzle bot built for beginners:
+```bash
+python -X utf8 mi_primer_bot.py
+```
+*(Read [`TUTORIAL.md`](file:///d:/Documentos/Bitunix-BOT/TUTORIAL.md) for step-by-step instructions on how this puzzle was assembled).*
+
 
 ---
 
@@ -293,10 +313,20 @@ Bitunix uses a VIP tier system (verified June 2026):
 ```
 bitunix-bot/
 │
-├── bot.py                    # Main entry point with CLI
+├── bot.py                    # Main entry point with CLI (standard/adaptive)
+├── bot_server.py             # FastAPI backend for the web dashboard
 ├── bitunix_client.py         # REST API client (double SHA256 auth)
-├── strategy_market_maker.py  # Market making strategy & logic
+├── strategy_market_maker.py  # Standard Market Making strategy
+├── strategy_adaptive.py      # Adaptive Strategy (5 advanced optimizations)
 ├── simulate.py               # Monte Carlo volume & PnL simulator
+├── ruin_instant.py           # Fast analytical capital ruin analysis
+│
+├── dashboard/
+│   └── index.html            # Stunning Dark Glassmorphic Web Dashboard
+│
+├── ACADEMY.md                # 5-module developer onboarding guide
+├── TUTORIAL.md               # Beginner puzzle copy-paste tutorial
+├── mi_primer_bot.py          # Assembled beginner puzzle bot
 │
 ├── .env                      # 🔐 API credentials (NOT committed to git)
 ├── .gitignore                # Protects .env and logs
@@ -304,7 +334,6 @@ bitunix-bot/
 ├── README.md                 # This file
 │
 └── logs/                     # Auto-created; session log files
-    └── bot_20260610_234700.log
 ```
 
 ### Architecture
