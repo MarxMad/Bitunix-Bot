@@ -12,18 +12,18 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg: #07070c;
-            --bg-gradient: radial-gradient(circle at 50% 50%, #121026 0%, #07070c 80%);
-            --card-bg: rgba(15, 15, 25, 0.55);
-            --card-border: rgba(255, 255, 255, 0.06);
-            --card-border-focus: rgba(255, 255, 255, 0.15);
+            --bg: #08090d;
+            --bg-gradient: radial-gradient(circle at 50% 50%, #0b1c16 0%, #07080b 90%);
+            --card-bg: rgba(11, 13, 19, 0.75);
+            --card-border: rgba(2, 192, 118, 0.08);
+            --card-border-focus: rgba(2, 192, 118, 0.25);
             --text: #f1f5f9;
             --text-muted: #64748b;
             --text-dark: #475569;
             
-            --primary: #00ff88;
-            --primary-glow: rgba(0, 255, 136, 0.35);
-            --primary-bg: rgba(0, 255, 136, 0.08);
+            --primary: #02c076; /* Bitunix Bright Brand Green */
+            --primary-glow: rgba(2, 192, 118, 0.4);
+            --primary-bg: rgba(2, 192, 118, 0.08);
 
             --secondary: #ff6b35;
             --secondary-glow: rgba(255, 107, 53, 0.35);
@@ -41,7 +41,7 @@
             --purple-glow: rgba(189, 147, 249, 0.35);
             --purple-bg: rgba(189, 147, 249, 0.08);
             
-            --glass-blur: blur(16px);
+            --glass-blur: blur(20px);
         }
 
         * {
@@ -123,12 +123,12 @@
             font-size: 24px;
             font-weight: 800;
             color: var(--bg);
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            box-shadow: 0 0 20px rgba(2, 192, 118, 0.4);
             animation: pulse-glow 3s infinite alternate;
         }
 
         @keyframes pulse-glow {
-            0% { box-shadow: 0 0 15px rgba(0, 255, 136, 0.3); }
+            0% { box-shadow: 0 0 15px rgba(2, 192, 118, 0.3); }
             100% { box-shadow: 0 0 25px rgba(0, 240, 255, 0.6); }
         }
 
@@ -559,7 +559,7 @@
 
         .input-group select:focus,
         .input-group input:focus {
-            border-color: rgba(0, 255, 136, 0.3);
+            border-color: rgba(2, 192, 118, 0.3);
             background: rgba(255,255,255,0.06);
         }
 
@@ -642,7 +642,7 @@
 
         input:checked + .slider {
             background-color: var(--primary);
-            box-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+            box-shadow: 0 0 8px rgba(2, 192, 118, 0.3);
         }
 
         input:checked + .slider:before {
@@ -677,12 +677,12 @@
         .btn-start {
             background: var(--primary);
             color: var(--bg);
-            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+            box-shadow: 0 4px 15px rgba(2, 192, 118, 0.3);
         }
 
         .btn-start:hover {
             background: #00e577;
-            box-shadow: 0 6px 20px rgba(0, 255, 136, 0.5);
+            box-shadow: 0 6px 20px rgba(2, 192, 118, 0.5);
             transform: translateY(-2px);
         }
 
@@ -1137,9 +1137,9 @@
                     datasets: [{
                         label: 'PnL Realizado (USDT)',
                         data: [],
-                        borderColor: '#00ff88',
+                        borderColor: '#02c076',
                         borderWidth: 2,
-                        backgroundColor: 'rgba(0, 255, 136, 0.06)',
+                        backgroundColor: 'rgba(2, 192, 118, 0.06)',
                         fill: true,
                         tension: 0.3,
                         pointRadius: 0,
@@ -1236,8 +1236,8 @@
             if (data.pnl >= 0) {
                 cardPnl.className = "glass-card metric-card pnl positive";
                 pnlValEl.style.color = "var(--primary)";
-                pnlChart.data.datasets[0].borderColor = '#00ff88';
-                pnlChart.data.datasets[0].backgroundColor = 'rgba(0, 255, 136, 0.06)';
+                pnlChart.data.datasets[0].borderColor = '#02c076';
+                pnlChart.data.datasets[0].backgroundColor = 'rgba(2, 192, 118, 0.06)';
             } else {
                 cardPnl.className = "glass-card metric-card pnl negative";
                 pnlValEl.style.color = "var(--danger)";
