@@ -60,7 +60,8 @@ bot_state: dict = {
     "last_price":       0.0,
     "uptime_seconds":   0,
     "stop_losses":      0,
-    "symbol":           "BTCUSDT",
+    "symbol":           "ETHUSDT",
+    "qty":              "0.01",
     "leverage":         5,
     "spread_pct":       0.0004,
     "max_loss":         10.0,
@@ -108,179 +109,39 @@ class InstrumentedMarketMaker(MarketMaker):
         self._fill_count = 0
         self._rt_count   = 0
         self._sl_count   = 0
-        self._prev_buy_id: Optional[str]  = None
-        self._prev_sell_id: Optional[str] = None
+        self._last_buy_price = 0.0
+        self._last_sell_price = 0.0
 
-    def _update_state(self, mid: float, position: dict):
+    def _detect_fills(self, active_orders: list, mid: float):
+        """Compare current pending orders on the exchange with our tracked active orders to detect fills."""
+        current_ids = {o["id"] for o in active_orders}
+        
+        # Check Buy side
+        if self.active_buy_id and self.active_buy_id not in current_ids:
+            self._fill_count += 1
+            qty = float(self.cfg.order_qty)
+            price = self._last_buy_price if self._last_buy_price > 0 else (mid * (1 - self.cfg.spread_pct/2))
+            val = qty * price
+            self.total_volume += val
+            logger.info(f"🎉 [FILL] BUY LIMIT filled! Price: {price:.2f} | Session Vol: +${val:.2f}")
+            self.active_buy_id = None
+            
+        # Check Sell side
+        if self.active_sell_id and self.active_sell_id not in current_ids:
+            self._fill_count += 1
+            qty = float(self.cfg.order_qty)
+            price = self._last_sell_price if self._last_sell_price > 0 else (mid * (1 + self.cfg.spread_pct/2))
+            val = qty * price
+            self.total_volume += val
+            logger.info(f"🎉 [FILL] SELL LIMIT filled! Price: {price:.2f} | Session Vol: +${val:.2f}")
+            
+            if self.active_buy_id is None: # Meaning buy filled earlier or just now
+                self._rt_count += 1
+                logger.info(f"🔁 [ROUND TRIP] Buy and Sell both filled!")
+            self.active_sell_id = None
+
+    def _update_state(self, mid: float, position: dict, active_orders: list):
         """Push current bot metrics into the shared state dict."""
-        # Fetch pending orders from exchange
-        active_orders = []
-        try:
-            resp = self.client.get_pending_orders(self.cfg.symbol)
-            orders = resp.get("data", []) or []
-            for o in orders:
-                active_orders.append({
-                    "id":    o.get("orderId", ""),
-                    "side":  o.get("side", ""),
-                    "price": float(o.get("price", 0)),
-                    "qty":   o.get("qty", ""),
-                })
-        except Exception:
-            pass
-
-        # Determine position details
-        pos_side   = position.get("side", "FLAT") if position else "FLAT"
-        pos_qty    = float(position.get("qty", 0))    if position else 0.0
-        entry_px   = float(position.get("avgOpenPrice", 0)) if position else 0.0
-        unreal_pnl = float(position.get("unrealizedPnl", 0)) if position else 0.0
-        margin     = float(position.get("margin", 1))  if position else 1.0
-
-        # Drawdown and circuit-breaker percentages
-        max_loss = self.cfg.max_total_loss_usdt
-        drawdown_pct = min(100.0, abs(min(0.0, self.realized_pnl)) / max(max_loss, 0.01) * 100)
-        circuit_pct  = drawdown_pct  # same signal for display
-
-        # Uptime
-        uptime = int(time.time() - _start_time) if _start_time else 0
-
-        # Account capital (best-effort)
-        capital = 0.0
-        try:
-            acc = self.client.get_account()
-            cap_raw = acc.get("data", {})
-            if isinstance(cap_raw, list) and cap_raw:
-                cap_raw = cap_raw[0]
-            if isinstance(cap_raw, dict):
-                capital = float(cap_raw.get("available", cap_raw.get("equity", 0)) or 0)
-        except Exception:
-            pass
-
-        with _state_lock:
-            bot_state["is_running"]      = self.running and not self._stop_event.is_set()
-            bot_state["pnl"]             = round(self.realized_pnl, 4)
-            bot_state["volume"]          = round(self.total_volume, 4)
-            bot_state["num_fills"]       = self._fill_count
-            bot_state["num_round_trips"] = self._rt_count
-            bot_state["active_orders"]   = active_orders
-            bot_state["last_price"]      = mid
-            bot_state["uptime_seconds"]  = uptime
-            bot_state["stop_losses"]     = self._sl_count
-            bot_state["capital"]         = round(capital, 2)
-            bot_state["circuit_breaker"] = self.realized_pnl <= -max_loss
-            bot_state["drawdown_pct"]    = round(drawdown_pct, 2)
-            bot_state["circuit_pct"]     = round(circuit_pct, 2)
-            bot_state["position"] = {
-                "symbol":        self.cfg.symbol,
-                "side":          pos_side.upper() if pos_side else "FLAT",
-                "qty":           pos_qty,
-                "entry_price":   entry_px,
-                "unrealized_pnl": unreal_pnl,
-                "margin":        margin,
-            }
-
-    def _check_stop_loss(self, position: dict) -> bool:
-        triggered = super()._check_stop_loss(position)
-        if triggered:
-            self._sl_count += 1
-        return triggered
-
-    def _place_maker_orders(self, mid: float):
-        """Override to count fills by detecting order ID changes."""
-        prev_buy  = self.active_buy_id
-        prev_sell = self.active_sell_id
-        super()._place_maker_orders(mid)
-        # Count volume contribution when orders are placed
-        try:
-            qty_f = float(self.cfg.order_qty)
-            # Approximate: each order pair adds 2×qty×price to volume
-            self.total_volume += 2 * qty_f * mid
-        except Exception:
-            pass
-
-    def step(self):
-        """Override step to update shared state after each cycle."""
-        mid = self._get_mid_price()
-        if mid == 0:
-            logger.warning("Could not get price, skipping step")
-            return
-
-        logger.info(f"📊 {self.cfg.symbol}  mid={mid:.4f}  volume={self.total_volume:.2f}  pnl={self.realized_pnl:.4f}")
-
-        # Circuit breaker
-        if self._check_circuit_breaker():
-            self.running = False
-            position = self._get_position()
-            self._update_state(mid, position)
-            return
-
-        # Position + stop-loss
-        position = self._get_position()
-        if self._check_stop_loss(position):
-            self._cancel_active_orders()
-            self._update_state(mid, {})
-            return
-
-        # Refresh orders if price drifted
-        if self._should_refresh(mid):
-            logger.info(f"🔄 Refreshing orders (mid {self.last_mid_price:.4f} → {mid:.4f})")
-            self._cancel_active_orders()
-            self._place_maker_orders(mid)
-            self.last_mid_price = mid
-
-        # Update shared state every step
-        self._update_state(mid, position)
-
-    def run(self):
-        """Run loop that respects the stop_event."""
-        self.setup()
-        logger.info(f"🚀 Market Maker started on {self.cfg.symbol}")
-
-        while self.running and not self._stop_event.is_set():
-            try:
-                self.step()
-            except Exception as e:
-                logger.error(f"Unhandled error in step: {e}", exc_info=True)
-            self._stop_event.wait(timeout=self.cfg.refresh_interval)
-
-        logger.info("🧹 Cleaning up: cancelling all open orders...")
-        self._cancel_active_orders()
-        logger.info(f"📈 Session ended: Volume={self.total_volume:.4f} | PnL={self.realized_pnl:.4f} USDT")
-
-        with _state_lock:
-            bot_state["is_running"] = False
-
-
-class InstrumentedAdaptiveMarketMaker(AdaptiveMarketMaker):
-    """
-    Extends AdaptiveMarketMaker to push live state into `bot_state` after every step.
-    Also counts fills, round-trips, and stop-loss events.
-    """
-
-    def __init__(self, client: BitunixClient, config: AdaptiveConfig, stop_event: threading.Event):
-        super().__init__(client, config)
-        self._stop_event = stop_event
-        self._fill_count = 0
-        self._rt_count   = 0
-        self._sl_count   = 0
-        self._prev_buy_id: Optional[str]  = None
-        self._prev_sell_id: Optional[str] = None
-
-    def _update_state(self, mid: float, position: dict):
-        """Push current bot metrics into the shared state dict."""
-        active_orders = []
-        try:
-            resp = self.client.get_pending_orders(self.cfg.symbol)
-            orders = resp.get("data", []) or []
-            for o in orders:
-                active_orders.append({
-                    "id":    o.get("orderId", ""),
-                    "side":  o.get("side", ""),
-                    "price": float(o.get("price", 0)),
-                    "qty":   o.get("qty", ""),
-                })
-        except Exception:
-            pass
-
         pos_side   = position.get("side", "FLAT") if position else "FLAT"
         pos_qty    = float(position.get("qty", 0))    if position else 0.0
         entry_px   = float(position.get("avgOpenPrice", 0)) if position else 0.0
@@ -326,15 +187,6 @@ class InstrumentedAdaptiveMarketMaker(AdaptiveMarketMaker):
                 "unrealized_pnl": unreal_pnl,
                 "margin":        margin,
             }
-            # Fill adaptive details for the UI dashboard
-            bot_state["adaptive_info"] = {
-                "adaptive_mode":    True,
-                "spread_pct":       round(self._current_spread_pct * 100, 4),
-                "sl_streak":        self._sl_streak,
-                "fill_streak":      self._fill_streak,
-                "in_cool_down":     self._in_cool_down,
-                "avg_capture":      round(self._avg_capture_ratio(), 2),
-            }
 
     def _check_stop_loss(self, position: dict) -> bool:
         triggered = super()._check_stop_loss(position)
@@ -343,47 +195,79 @@ class InstrumentedAdaptiveMarketMaker(AdaptiveMarketMaker):
         return triggered
 
     def _place_maker_orders(self, mid: float):
+        self._last_buy_price = mid * (1 - self.cfg.spread_pct / 2)
+        self._last_sell_price = mid * (1 + self.cfg.spread_pct / 2)
         super()._place_maker_orders(mid)
-        try:
-            qty_f = float(self.cfg.order_qty)
-            self.total_volume += 2 * qty_f * mid
-        except Exception:
-            pass
 
     def step(self):
+        """Override step to update shared state after each cycle."""
         mid = self._get_mid_price()
         if mid == 0:
             logger.warning("Could not get price, skipping step")
             return
 
-        logger.info(f"📊 [ADAPTIVE] {self.cfg.symbol}  mid={mid:.4f}  volume={self.total_volume:.2f}  pnl={self.realized_pnl:.4f}")
+        logger.info(f"📊 {self.cfg.symbol}  mid={mid:.4f}  volume={self.total_volume:.2f}  pnl={self.realized_pnl:.4f}")
 
+        # Fetch pending orders from exchange
+        active_orders = []
+        try:
+            resp = self.client.get_pending_orders(self.cfg.symbol)
+            orders = resp.get("data", []) or []
+            for o in orders:
+                active_orders.append({
+                    "id":    o.get("orderId", ""),
+                    "side":  o.get("side", ""),
+                    "price": float(o.get("price", 0)),
+                    "qty":   o.get("qty", ""),
+                })
+        except Exception:
+            pass
+
+        # Detect any executed fills *before* checking stops or reposting
+        self._detect_fills(active_orders, mid)
+
+        # Circuit breaker
         if self._check_circuit_breaker():
             self.running = False
             position = self._get_position()
-            self._update_state(mid, position)
+            self._update_state(mid, position, active_orders)
             return
 
+        # Position + stop-loss
         position = self._get_position()
         if self._check_stop_loss(position):
             self._cancel_active_orders()
-            self._update_state(mid, {})
+            self._update_state(mid, {}, [])
             return
 
-        if len(self._fill_records) > 0 and len(self._fill_records) % 10 == 0:
-            self._log_fill_quality()
-
+        # Refresh orders if price drifted
         if self._should_refresh(mid):
             logger.info(f"🔄 Refreshing orders (mid {self.last_mid_price:.4f} → {mid:.4f})")
             self._cancel_active_orders()
             self._place_maker_orders(mid)
             self.last_mid_price = mid
+            # Fetch active orders again since we just replaced them
+            active_orders = []
+            try:
+                resp = self.client.get_pending_orders(self.cfg.symbol)
+                orders = resp.get("data", []) or []
+                for o in orders:
+                    active_orders.append({
+                        "id":    o.get("orderId", ""),
+                        "side":  o.get("side", ""),
+                        "price": float(o.get("price", 0)),
+                        "qty":   o.get("qty", ""),
+                    })
+            except Exception:
+                pass
 
-        self._update_state(mid, position)
+        # Update shared state every step
+        self._update_state(mid, position, active_orders)
 
     def run(self):
+        """Run loop that respects the stop_event."""
         self.setup()
-        logger.info(f"🚀 Adaptive Market Maker started on {self.cfg.symbol}")
+        logger.info(f"🚀 Market Maker started on {self.cfg.symbol}")
 
         while self.running and not self._stop_event.is_set():
             try:
@@ -398,6 +282,124 @@ class InstrumentedAdaptiveMarketMaker(AdaptiveMarketMaker):
 
         with _state_lock:
             bot_state["is_running"] = False
+
+
+class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMaker):
+    """
+    Extends AdaptiveMarketMaker using InstrumentedMarketMaker's fill detection & state reporting.
+    """
+
+    def __init__(self, client: BitunixClient, config: AdaptiveConfig, stop_event: threading.Event):
+        # Explicitly call constructors of both bases
+        AdaptiveMarketMaker.__init__(self, client, config)
+        self._stop_event = stop_event
+        self._fill_count = 0
+        self._rt_count   = 0
+        self._sl_count   = 0
+        self._last_buy_price = 0.0
+        self._last_sell_price = 0.0
+
+    def _update_state(self, mid: float, position: dict, active_orders: list):
+        """Override to also push adaptive stats details."""
+        # Call the base state updater first
+        super()._update_state(mid, position, active_orders)
+        
+        # Then append adaptive stats
+        with _state_lock:
+            bot_state["adaptive_info"] = {
+                "adaptive_mode":    True,
+                "spread_pct":       round(self._current_spread_pct * 100, 4),
+                "sl_streak":        self._sl_streak,
+                "fill_streak":      self._fill_streak,
+                "in_cool_down":     self._in_cool_down,
+                "avg_capture":      round(self._avg_capture_ratio(), 2),
+            }
+
+    def _place_maker_orders(self, mid: float):
+        # For adaptive, the spread is calculated during placement
+        spread = self._adaptive_spread()
+        self._current_spread_pct = spread
+        self._last_buy_price = mid * (1 - spread / 2)
+        self._last_sell_price = mid * (1 + spread / 2)
+        
+        # Call AdaptiveMarketMaker's placement method directly
+        AdaptiveMarketMaker._place_maker_orders(self, mid)
+
+    def _check_stop_loss(self, position: dict) -> bool:
+        # Resolve to Adaptive's risk logic (which registers SL streaks)
+        triggered = AdaptiveMarketMaker._check_stop_loss(self, position)
+        if triggered:
+            self._sl_count += 1
+        return triggered
+
+    def step(self):
+        """Override step using Adaptive's checks but with fill detection and state updates."""
+        mid = self._get_mid_price()
+        if mid == 0:
+            logger.warning("Could not get price, skipping step")
+            return
+
+        logger.info(f"📊 [ADAPTIVE] {self.cfg.symbol}  mid={mid:.4f}  volume={self.total_volume:.2f}  pnl={self.realized_pnl:.4f}")
+
+        # Fetch active orders
+        active_orders = []
+        try:
+            resp = self.client.get_pending_orders(self.cfg.symbol)
+            orders = resp.get("data", []) or []
+            for o in orders:
+                active_orders.append({
+                    "id":    o.get("orderId", ""),
+                    "side":  o.get("side", ""),
+                    "price": float(o.get("price", 0)),
+                    "qty":   o.get("qty", ""),
+                })
+        except Exception:
+            pass
+
+        # Detect executed fills
+        self._detect_fills(active_orders, mid)
+
+        # Circuit breaker
+        if self._check_circuit_breaker():
+            self.running = False
+            position = self._get_position()
+            self._update_state(mid, position, active_orders)
+            return
+
+        # Position + stop-loss
+        position = self._get_position()
+        if self._check_stop_loss(position):
+            self._cancel_active_orders()
+            self._update_state(mid, {}, [])
+            return
+
+        # Periodic fill-quality report
+        if len(self._fill_records) > 0 and len(self._fill_records) % 10 == 0:
+            self._log_fill_quality()
+
+        # Refresh orders if price drifted
+        if self._should_refresh(mid):
+            logger.info(f"🔄 Refreshing orders (mid {self.last_mid_price:.4f} → {mid:.4f})")
+            self._cancel_active_orders()
+            self._place_maker_orders(mid)
+            self.last_mid_price = mid
+            # Fetch active orders again
+            active_orders = []
+            try:
+                resp = self.client.get_pending_orders(self.cfg.symbol)
+                orders = resp.get("data", []) or []
+                for o in orders:
+                    active_orders.append({
+                        "id":    o.get("orderId", ""),
+                        "side":  o.get("side", ""),
+                        "price": float(o.get("price", 0)),
+                        "qty":   o.get("qty", ""),
+                    })
+            except Exception:
+                pass
+
+        # Update state
+        self._update_state(mid, position, active_orders)
 
 
 # ─── FastAPI app ──────────────────────────────────────────────────────────────
@@ -416,8 +418,8 @@ app.add_middleware(
 # ─── Pydantic models ──────────────────────────────────────────────────────────
 
 class StartRequest(BaseModel):
-    symbol:           str   = "BTCUSDT"
-    qty:              str   = "0.001"
+    symbol:           str   = "ETHUSDT"
+    qty:              str   = "0.01"
     leverage:         int   = 5
     spread:           float = 0.0004
     max_loss:         float = 10.0
