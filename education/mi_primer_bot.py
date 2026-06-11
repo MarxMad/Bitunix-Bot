@@ -10,7 +10,11 @@
 import os
 import time
 from dotenv import load_dotenv
-from bitunix_client import BitunixClient
+# ── make repo root importable when run directly ──
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..")))
+
+from shared.bitunix_client import BitunixClient
 
 # 1. Cargar llaves (.env)
 load_dotenv()

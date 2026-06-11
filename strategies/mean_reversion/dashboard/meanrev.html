@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bitunix · Mean-Reversion XLM</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#08090d; --bg-grad:radial-gradient(circle at 50% 0%, #0b1c16 0%, #07080b 70%);
+    --card:rgba(13,16,23,.78); --border:rgba(2,192,118,.10); --border2:rgba(2,192,118,.28);
+    --text:#f1f5f9; --muted:#64748b; --dark:#475569;
+    --green:#02c076; --green-glow:rgba(2,192,118,.35); --green-bg:rgba(2,192,118,.08);
+    --red:#ff3366; --red-bg:rgba(255,51,102,.08);
+    --amber:#ff6b35; --amber-bg:rgba(255,107,53,.08);
+    --info:#00f0ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Outfit',sans-serif;background:var(--bg);background-image:var(--bg-grad);
+       background-attachment:fixed;color:var(--text);min-height:100vh;padding:24px;font-size:14px}
+  .mono{font-family:'JetBrains Mono',monospace}
+  a{color:var(--green)}
+  .wrap{max-width:1280px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--green),#00e577);
+        display:grid;place-items:center;font-weight:800;color:#04130d;font-size:20px;box-shadow:0 0 24px var(--green-glow)}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:12px;font-weight:400}
+  .pill{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
+        font-size:12px;font-weight:600;border:1px solid var(--border2)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--dark)}
+  .dot.on{background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 1.6s infinite}
+  .dot.off{background:var(--red)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .grid{display:grid;gap:16px}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;
+        backdrop-filter:blur(18px)}
+  .card .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+  .card .val{font-size:26px;font-weight:700;margin-top:8px;letter-spacing:-.5px}
+  .card .hint{color:var(--dark);font-size:11px;margin-top:4px}
+  .pos{color:var(--green)} .neg{color:var(--red)} .mut{color:var(--muted)}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;backdrop-filter:blur(18px)}
+  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:14px;font-weight:600}
+  .row2{grid-template-columns:1.6fr 1fr}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--muted);font-weight:600}
+  .field input,.field select{background:#0b0e14;border:1px solid var(--border2);color:var(--text);
+        border-radius:10px;padding:9px 12px;font-family:'JetBrains Mono',monospace;width:120px;font-size:13px}
+  .toggle{display:flex;align-items:center;gap:8px}
+  .btn{border:none;border-radius:10px;padding:11px 22px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;transition:.15s}
+  .btn-start{background:var(--green);color:#04130d}.btn-start:hover{background:#00e577;box-shadow:0 0 18px var(--green-glow)}
+  .btn-stop{background:var(--red);color:#fff}.btn-stop:hover{background:#ff1a53}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  canvas{width:100%!important}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;
+     letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--border)}
+  td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+  .tag{padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
+  .tag.long{background:var(--green-bg);color:var(--green)} .tag.short{background:var(--red-bg);color:var(--red)}
+  .tag.exit{background:var(--green-bg);color:var(--green)} .tag.stop{background:var(--red-bg);color:var(--red)}
+  .tag.time_stop{background:var(--amber-bg);color:var(--amber)}
+  .log{font-family:'JetBrains Mono',monospace;font-size:11px;max-height:230px;overflow-y:auto;line-height:1.7}
+  .log .ln{padding:3px 10px;border-left:2px solid var(--green);margin-bottom:3px;color:#cbd5e1;background:rgba(255,255,255,.015)}
+  .log .ln.WARNING{border-color:var(--amber);color:#fde047}
+  .log .ln.ERROR,.log .ln.CRITICAL{border-color:var(--red);color:#fca5a5}
+  .statebadge{font-size:13px;font-weight:700;padding:5px 12px;border-radius:8px;background:var(--green-bg);color:var(--green)}
+  .mt{margin-top:16px}
+  .zgauge{font-size:34px;font-weight:800;letter-spacing:-1px}
+  .small{font-size:11px;color:var(--muted)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:10px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .lg{width:18px;height:0;border-top:2px solid}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">B</div>
+      <div>
+        <h1>Mean-Reversion · <span style="color:var(--green)">XLM</span></h1>
+        <div class="sub">Reversión a la media en extremos 3σ · ejecución maker · Bitunix Futures</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="pill" id="modePill"><span class="dot" id="modeDot"></span><span id="modeTxt">—</span></span>
+      <span class="pill"><span class="dot" id="connDot"></span><span id="connTxt">conectando…</span></span>
+    </div>
+  </header>
+
+  <!-- Controls -->
+  <div class="panel">
+    <h2>Control</h2>
+    <div class="controls">
+      <div class="field"><label>Símbolo</label><input id="symbol" value="XLMUSDT"/></div>
+      <div class="field"><label>Qty (≥80)</label><input id="qty" class="mono" value="80"/></div>
+      <div class="field"><label>Leverage</label><input id="leverage" class="mono" value="3"/></div>
+      <div class="field"><label>Timeframe</label>
+        <select id="interval"><option>5m</option><option>1m</option><option>15m</option></select></div>
+      <div class="field"><label>z entrada</label><input id="zin" class="mono" value="3.0"/></div>
+      <div class="field"><label>z salida</label><input id="zexit" class="mono" value="0.5"/></div>
+      <div class="field"><label>Modo</label>
+        <div class="toggle" style="height:38px"><input type="checkbox" id="dryrun" checked/><span class="small">Dry-run (sin órdenes)</span></div></div>
+      <button class="btn btn-start" id="startBtn" onclick="startBot()">▶ Iniciar</button>
+      <button class="btn btn-stop" id="stopBtn" onclick="stopBot()" disabled>■ Detener</button>
+    </div>
+  </div>
+
+  <!-- KPI cards -->
+  <div class="grid cards mt">
+    <div class="card"><div class="label">PnL Sesión</div><div class="val mono" id="pnl">$0.00</div><div class="hint" id="pnlHint">realizado</div></div>
+    <div class="card"><div class="label">PnL Día</div><div class="val mono" id="dpnl">$0.00</div><div class="hint">límite -<span id="dlim">1</span></div></div>
+    <div class="card"><div class="label">Trades</div><div class="val mono" id="trades">0</div><div class="hint" id="winrate">win — %</div></div>
+    <div class="card"><div class="label">z-score actual</div><div class="val mono zgauge" id="zval">0.00</div><div class="hint" id="zhint">—</div></div>
+    <div class="card"><div class="label">Estado</div><div class="val"><span class="statebadge" id="execState">FLAT</span></div><div class="hint" id="posHint">sin posición</div></div>
+    <div class="card"><div class="label">Precio</div><div class="val mono" id="mid">—</div><div class="hint" id="uptime">uptime 0s</div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid row2 mt">
+    <div class="panel">
+      <h2>z-score en vivo · bandas de operación</h2>
+      <canvas id="zChart" height="240"></canvas>
+      <div class="legend">
+        <span><span class="lg" style="border-color:var(--info)"></span>z-score</span>
+        <span><span class="lg" style="border-color:var(--green)"></span>±entrada (3σ)</span>
+        <span><span class="lg" style="border-color:var(--muted)"></span>±salida</span>
+        <span><span class="lg" style="border-color:var(--red)"></span>±stop</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Curva de PnL (USDT)</h2>
+      <canvas id="eqChart" height="240"></canvas>
+    </div>
+  </div>
+
+  <!-- Trades + log -->
+  <div class="grid row2 mt">
+    <div class="panel">
+      <h2>Historial de trades</h2>
+      <div style="max-height:280px;overflow-y:auto">
+        <table>
+          <thead><tr><th>#</th><th>Hora</th><th>Lado</th><th>Salida</th><th>Entrada</th><th>Exit</th><th>PnL</th></tr></thead>
+          <tbody id="tradesBody"><tr><td colspan="7" class="mut" style="text-align:center;padding:20px">Sin trades aún</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Log en vivo</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <div class="small" style="text-align:center;margin-top:22px;color:var(--dark)">
+    Edge validado en 60d de datos reales de Bitunix · +18% / Sharpe 1.3 · ver research/04 · Empieza en dry-run.
+  </div>
+</div>
+
+<script>
+const API = location.origin.replace(/^http/, 'http');     // same host:8001
+const WSURL = location.origin.replace(/^http/, 'ws') + '/ws';
+let zChart, eqChart;
+
+function fmtUsd(v){const s=v>=0?'+':'';return s+'$'+Math.abs(v).toFixed(4)}
+function cls(v){return v>0?'pos':v<0?'neg':'mut'}
+
+function initCharts(){
+  const gridC={color:'rgba(255,255,255,.04)'}, tickC={color:'#64748b',font:{family:'JetBrains Mono'}};
+  zChart=new Chart(document.getElementById('zChart'),{
+    type:'line',
+    data:{labels:[],datasets:[
+      {label:'z',data:[],borderColor:'#00f0ff',backgroundColor:'rgba(0,240,255,.06)',borderWidth:2,tension:.25,pointRadius:0,fill:true},
+    ]},
+    options:{responsive:true,animation:false,plugins:{legend:{display:false},
+      annotation:false},
+      scales:{x:{grid:gridC,ticks:{...tickC,maxTicksLimit:8}},
+              y:{grid:gridC,ticks:tickC,suggestedMin:-4,suggestedMax:4}}}
+  });
+  eqChart=new Chart(document.getElementById('eqChart'),{
+    type:'line',
+    data:{labels:[],datasets:[
+      {label:'PnL',data:[],borderColor:'#02c076',backgroundColor:'rgba(2,192,118,.10)',borderWidth:2,tension:.2,pointRadius:0,fill:true}
+    ]},
+    options:{responsive:true,animation:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:gridC,ticks:{...tickC,maxTicksLimit:8}},y:{grid:gridC,ticks:tickC}}}
+  });
+}
+
+// horizontal band lines drawn via a tiny plugin
+const bandPlugin={
+  id:'bands',
+  afterDraw(chart){
+    if(chart.canvas.id!=='zChart')return;
+    const {ctx,chartArea:{left,right},scales:{y}}=chart;
+    const lines=[[window._zin,'#02c076'],[-window._zin,'#02c076'],
+                 [window._zexit,'#64748b'],[-window._zexit,'#64748b'],
+                 [window._zstop,'#ff3366'],[-window._zstop,'#ff3366']];
+    ctx.save();ctx.setLineDash([5,5]);ctx.lineWidth=1;
+    lines.forEach(([v,c])=>{if(v==null)return;const yp=y.getPixelForValue(v);
+      ctx.strokeStyle=c;ctx.beginPath();ctx.moveTo(left,yp);ctx.lineTo(right,yp);ctx.stroke();});
+    ctx.restore();
+  }
+};
+
+function render(s){
+  // status pills
+  document.getElementById('connDot').className='dot on';
+  document.getElementById('connTxt').textContent='conectado';
+  const md=document.getElementById('modeDot'), mt=document.getElementById('modeTxt');
+  mt.textContent = s.running ? (s.mode+' · activo') : 'detenido';
+  md.className='dot '+(s.running?'on':'off');
+  document.getElementById('startBtn').disabled=s.running;
+  document.getElementById('stopBtn').disabled=!s.running;
+
+  // KPIs
+  const pnl=document.getElementById('pnl');pnl.textContent=fmtUsd(s.realized_pnl);pnl.className='val mono '+cls(s.realized_pnl);
+  const dpnl=document.getElementById('dpnl');dpnl.textContent=fmtUsd(s.daily_pnl);dpnl.className='val mono '+cls(s.daily_pnl);
+  document.getElementById('dlim').textContent=s.daily_loss_limit;
+  document.getElementById('trades').textContent=s.trade_count;
+  document.getElementById('winrate').textContent = s.trade_count? ('win '+Math.round(100*s.wins/s.trade_count)+'%') : 'win — %';
+  const zv=document.getElementById('zval');zv.textContent=(s.z>=0?'+':'')+s.z.toFixed(2);
+  zv.className='val mono zgauge '+(Math.abs(s.z)>=s.z_in?(s.z<0?'pos':'neg'):'');
+  document.getElementById('zhint').textContent = Math.abs(s.z)>=s.z_in?'¡extremo!':'dentro de rango';
+  document.getElementById('execState').textContent=s.exec_state;
+  document.getElementById('posHint').textContent = s.position_side?
+     (s.position_side.toUpperCase()+' @ '+s.entry_px+' · '+s.bars_held+'/'+s.max_hold+' barras') : 'sin posición';
+  document.getElementById('mid').textContent = s.mid? s.mid : '—';
+  document.getElementById('uptime').textContent='uptime '+s.uptime_seconds+'s';
+
+  // bands for plugin
+  window._zin=s.z_in; window._zexit=s.z_exit; window._zstop=s.z_stop;
+
+  // z chart
+  zChart.data.labels = s.z_history.map(p=>p.t);
+  zChart.data.datasets[0].data = s.z_history.map(p=>p.z);
+  zChart.update('none');
+
+  // equity chart
+  eqChart.data.labels = s.equity_curve.map(p=>'#'+p.n);
+  eqChart.data.datasets[0].data = s.equity_curve.map(p=>p.equity);
+  eqChart.update('none');
+
+  // trades
+  const tb=document.getElementById('tradesBody');
+  if(s.trades.length){
+    tb.innerHTML = s.trades.slice().reverse().map(t=>`<tr>
+      <td class="mono">${t.n}</td><td class="mono mut">${t.t}</td>
+      <td><span class="tag ${t.side}">${(t.side||'').toUpperCase()}</span></td>
+      <td><span class="tag ${t.reason}">${t.reason}</span></td>
+      <td class="mono">${t.entry}</td><td class="mono">${t.exit}</td>
+      <td class="mono ${cls(t.pnl)}">${fmtUsd(t.pnl)}</td></tr>`).join('');
+  }
+
+  // log
+  const lg=document.getElementById('log');
+  lg.innerHTML = s.log_lines.slice(-40).map(l=>{
+    let c='';if(l.includes('WARNING'))c='WARNING';else if(l.includes('ERROR')||l.includes('CRITICAL'))c='ERROR';
+    return `<div class="ln ${c}">${l.replace(/</g,'&lt;')}</div>`;
+  }).join('');
+  lg.scrollTop=lg.scrollHeight;
+}
+
+async function startBot(){
+  const body={symbol:document.getElementById('symbol').value,
+    qty:parseFloat(document.getElementById('qty').value),
+    leverage:parseInt(document.getElementById('leverage').value),
+    interval:document.getElementById('interval').value,
+    z_in:parseFloat(document.getElementById('zin').value),
+    z_exit:parseFloat(document.getElementById('zexit').value),
+    dry_run:document.getElementById('dryrun').checked};
+  const r=await fetch(API+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json(); if(!j.ok) alert(j.detail);
+}
+async function stopBot(){await fetch(API+'/stop',{method:'POST'});}
+
+function connect(){
+  const ws=new WebSocket(WSURL);
+  ws.onmessage=e=>render(JSON.parse(e.data));
+  ws.onclose=()=>{document.getElementById('connDot').className='dot off';
+    document.getElementById('connTxt').textContent='reconectando…';setTimeout(connect,2000);};
+}
+initCharts();
+Chart.register(bandPlugin);
+connect();
+</script>
+</body>
+</html>

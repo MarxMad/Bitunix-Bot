@@ -26,8 +26,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from colorama import init, Fore, Style
 
-from strategy_market_maker import MarketMaker, MarketMakerConfig
-from strategy_adaptive import AdaptiveMarketMaker, AdaptiveConfig
+from shared.bitunix_client import BitunixClient
+from strategies.market_maker.strategy_market_maker import MarketMaker, MarketMakerConfig
+from strategies.market_maker.strategy_adaptive import AdaptiveMarketMaker, AdaptiveConfig
+from strategies.mean_reversion.strategy_meanrev import MeanReversionMaker, MeanRevConfig
+from strategies.mean_reversion.meanrev_core import MeanRevParams
 
 # ─── Coloured logging ─────────────────────────────────────────────────────────
 
@@ -101,6 +104,10 @@ def parse_args():
     parser.add_argument("--log-level",     default="INFO",      help="Log level: DEBUG, INFO, WARNING, ERROR")
     parser.add_argument("--dry-run",       action="store_true", help="Dry run: fetch market data but do NOT place orders")
     parser.add_argument("--adaptive",      action="store_true", help="Use adaptive market making strategy with optimizations")
+    parser.add_argument("--meanrev",       action="store_true", help="Use the validated XLM mean-reversion maker strategy")
+    parser.add_argument("--interval",      default="5m",        help="[meanrev] signal timeframe (e.g. 5m)")
+    parser.add_argument("--z-in",          default=3.0,         type=float, help="[meanrev] entry z-score (>=3 recommended)")
+    parser.add_argument("--z-exit",        default=0.5,         type=float, help="[meanrev] exit z-score band")
     return parser.parse_args()
 
 
@@ -165,6 +172,27 @@ def main():
 
     if args.dry_run:
         log.warning("⚠️  DRY RUN mode: No orders will be placed!")
+
+    # ── Mean-reversion strategy (own dry-run handling) ──────────────────────
+    if args.meanrev:
+        log.info("🚀 Using MEAN-REVERSION MAKER strategy (validated on XLMUSDT).")
+        if args.symbol != "XLMUSDT":
+            log.warning(f"⚠️  Edge was validated on XLMUSDT; {args.symbol} is unvalidated.")
+        mr_cfg = MeanRevConfig(
+            symbol=args.symbol,
+            interval=args.interval,
+            order_qty=float(args.qty) if float(args.qty) >= 1 else 80,
+            leverage=args.leverage,
+            params=MeanRevParams(z_in=args.z_in, z_exit=args.z_exit),
+            dry_run=args.dry_run,
+        )
+        try:
+            MeanReversionMaker(client, mr_cfg).run()
+        except KeyboardInterrupt:
+            log.info("Stopped by user.")
+        finally:
+            log.info("Bot shutdown complete.")
+        return
 
     # Build config
     cfg = MarketMakerConfig(

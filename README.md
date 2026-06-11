@@ -20,6 +20,7 @@ Generate high trading volume with symmetric limit orders and automatic risk cont
 ## Table of Contents
 
 - [What Is Market Making?](#what-is-market-making)
+- [Profit Strategy: XLM Mean-Reversion](#profit-strategy-xlm-mean-reversion)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
@@ -48,6 +49,48 @@ Market making is a strategy where you simultaneously place a **limit buy order**
 ```
 
 > The bot continuously cancels and re-places orders as the price moves, ensuring the spread is always centered around the current market price.
+
+---
+
+## Profit Strategy: XLM Mean-Reversion
+
+The market maker above is **volume-optimized** (it generates huge volume but is
+roughly break-even to slightly negative by design). For **profit**, the repo also
+ships a separate, research-backed strategy: **mean reversion on `XLMUSDT`**.
+
+> When XLM deviates **≥ 3 standard deviations** from its rolling mean, fade it with
+> a **maker (limit)** order; exit when it reverts toward the mean.
+
+It was developed by downloading **60 days of real Bitunix klines** and validating
+the edge out-of-sample and against slippage:
+
+| Metric (60d, validated) | Value |
+|---|---|
+| Net return | **+18%** |
+| Sharpe (approx) | **~1.3** |
+| Win rate | 62% |
+| Max drawdown | −11% |
+| Out-of-sample | Both halves positive |
+
+Key insight: **maker execution is mandatory** — the same strategy with taker fees
+(0.06%) goes from +18% to −40%. ETH and other symbols showed **no edge** and should
+not be traded with it blindly.
+
+```bash
+RES=strategies/mean_reversion/research
+# Backtest on real Bitunix data
+.venv/bin/python $RES/scripts/fetch_bitunix_klines.py XLMUSDT --days 60 --interval 1m
+.venv/bin/python strategies/mean_reversion/backtest.py $RES/data/XLMUSDT_1m.csv --slip-bps 2 --oos
+
+# Dedicated live dashboard (port 8001) — start in dry-run
+.venv/bin/python strategies/mean_reversion/meanrev_server.py   # open http://localhost:8001
+
+# Headless CLI (entry point stays at repo root)
+.venv/bin/python bot.py --meanrev --symbol XLMUSDT --dry-run
+```
+
+📖 **Full strategy doc:** [`strategies/mean_reversion/STRATEGY.md`](strategies/mean_reversion/STRATEGY.md) ·
+**research & backtests:** [`strategies/mean_reversion/research/`](strategies/mean_reversion/research/)
 
 ---
 
@@ -115,7 +158,7 @@ SECRET_KEY=your_bitunix_secret_key_here
 ### 3. Run the volume simulator first (no real orders)
 
 ```bash
-python -X utf8 simulate.py --capital 50 --leverage 10 --hours 24
+python -X utf8 strategies/market_maker/simulate.py --capital 50 --leverage 10 --hours 24
 ```
 
 ### 4. Test connectivity with dry-run
@@ -142,19 +185,26 @@ python -X utf8 bot.py --adaptive --symbol BTCUSDT --qty 0.001 --leverage 5 --max
 
 Start the FastAPI backend server:
 ```bash
-python -X utf8 bot_server.py
+python -X utf8 strategies/market_maker/bot_server.py
 ```
 *This starts the API & WebSocket server on `http://localhost:8000`.*
 
-Now simply open the file [`dashboard/index.html`](file:///d:/Documentos/Bitunix-BOT/dashboard/index.html) in any web browser to view active metrics, positions, orders, live logs, and start/stop the bot in standard or adaptive mode.
+Now open [`strategies/market_maker/dashboard/index.html`](strategies/market_maker/dashboard/index.html) in any web browser to view active metrics, positions, orders, live logs, and start/stop the bot in standard or adaptive mode.
 
-### 8. Run the Beginner's Puzzle Bot (Educational)
+### 8. Run the Mean-Reversion Strategy Dashboard (profit-oriented)
+
+```bash
+python -X utf8 strategies/mean_reversion/meanrev_server.py   # then open http://localhost:8001
+```
+*See [`strategies/mean_reversion/STRATEGY.md`](strategies/mean_reversion/STRATEGY.md).*
+
+### 9. Run the Beginner's Puzzle Bot (Educational)
 
 To run the simple copy-paste puzzle bot built for beginners:
 ```bash
-python -X utf8 mi_primer_bot.py
+python -X utf8 education/mi_primer_bot.py
 ```
-*(Read [`TUTORIAL.md`](file:///d:/Documentos/Bitunix-BOT/TUTORIAL.md) for step-by-step instructions on how this puzzle was assembled).*
+*(Read [`docs/TUTORIAL.md`](docs/TUTORIAL.md) for step-by-step instructions on how this puzzle was assembled).*
 
 
 ---
@@ -311,29 +361,41 @@ Bitunix uses a VIP tier system (verified June 2026):
 ## Project Structure
 
 ```
-bitunix-bot/
+Bitunix-Bot/
 │
-├── bot.py                    # Main entry point with CLI (standard/adaptive)
-├── bot_server.py             # FastAPI backend for the web dashboard
-├── bitunix_client.py         # REST API client (double SHA256 auth)
-├── strategy_market_maker.py  # Standard Market Making strategy
-├── strategy_adaptive.py      # Adaptive Strategy (5 advanced optimizations)
-├── simulate.py               # Monte Carlo volume & PnL simulator
-├── ruin_instant.py           # Fast analytical capital ruin analysis
+├── bot.py                         # Unified entry point (standard/adaptive/meanrev)
+├── README.md  requirements.txt  .gitignore  .env
 │
-├── dashboard/
-│   └── index.html            # Stunning Dark Glassmorphic Web Dashboard
+├── shared/
+│   └── bitunix_client.py          # REST API client (double SHA256 auth) — shared
 │
-├── ACADEMY.md                # 5-module developer onboarding guide
-├── TUTORIAL.md               # Beginner puzzle copy-paste tutorial
-├── mi_primer_bot.py          # Assembled beginner puzzle bot
+├── strategies/
+│   ├── market_maker/              # Volume-oriented market making
+│   │   ├── strategy_market_maker.py   # Standard strategy
+│   │   ├── strategy_adaptive.py       # Adaptive strategy (5 optimizations)
+│   │   ├── bot_server.py              # Dashboard backend (port 8000)
+│   │   ├── simulate.py                # Monte Carlo volume & PnL simulator
+│   │   ├── ruin_*.py                  # Capital ruin analysis
+│   │   └── dashboard/index.html       # Volume dashboard
+│   │
+│   └── mean_reversion/            # Profit-oriented mean reversion (XLM)
+│       ├── STRATEGY.md                # Strategy documentation
+│       ├── meanrev_core.py            # Signal logic (shared backtest+live)
+│       ├── strategy_meanrev.py        # Live + dry-run strategy
+│       ├── backtest.py                # Backtester over real Bitunix klines
+│       ├── meanrev_server.py          # Dashboard backend (port 8001)
+│       ├── dashboard/meanrev.html     # z-score bands, PnL, trades dashboard
+│       └── research/                  # Quant journey: 01..05 docs + scripts + data
 │
-├── .env                      # 🔐 API credentials (NOT committed to git)
-├── .gitignore                # Protects .env and logs
-├── requirements.txt          # Python dependencies
-├── README.md                 # This file
+├── docs/
+│   ├── ACADEMY.md                 # 5-module developer onboarding guide
+│   └── TUTORIAL.md                # Beginner puzzle tutorial
 │
-└── logs/                     # Auto-created; session log files
+├── education/
+│   └── mi_primer_bot.py           # Assembled beginner puzzle bot
+│
+├── data/                          # Raw klines / CSVs (git-ignored)
+└── logs/                          # Auto-created session logs (git-ignored)
 ```
 
 ### Architecture

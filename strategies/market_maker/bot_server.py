@@ -27,9 +27,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from bitunix_client import BitunixClient
-from strategy_market_maker import MarketMaker, MarketMakerConfig
-from strategy_adaptive import AdaptiveMarketMaker, AdaptiveConfig
+# ── make repo root importable when run directly ──
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..", "..")))
+
+from shared.bitunix_client import BitunixClient
+from strategies.market_maker.strategy_market_maker import MarketMaker, MarketMakerConfig
+from strategies.market_maker.strategy_adaptive import AdaptiveMarketMaker, AdaptiveConfig
 
 # ─── Logging setup ────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -573,4 +577,4 @@ async def websocket_endpoint(ws: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("bot_server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -22,7 +22,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
-from bitunix_client import BitunixClient
+from shared.bitunix_client import BitunixClient
 
 logger = logging.getLogger(__name__)
 

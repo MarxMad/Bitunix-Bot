@@ -18,7 +18,12 @@ build/
 logs/
 *.log
 
-# Data
+# Data (raw klines / MT4 exports — large, regenerable)
 data/
+**/research/data/
+*.csv
 *.db
 *.sqlite3
+
+# macOS
+.DS_Store

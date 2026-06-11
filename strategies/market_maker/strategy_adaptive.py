@@ -41,7 +41,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from bitunix_client import BitunixClient
+from shared.bitunix_client import BitunixClient
 
 logger = logging.getLogger(__name__)
 
