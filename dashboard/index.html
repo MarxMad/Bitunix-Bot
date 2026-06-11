@@ -1254,31 +1254,47 @@
             const seconds = String(uptime % 60).padStart(2, '0');
             document.getElementById("val-uptime").innerText = `${hours}:${minutes}:${seconds}`;
 
-            // Chart data updates
-            // Only push if value is different from last data point
-            const pnlData = pnlChart.data.datasets[0].data;
-            if (pnlData.length === 0 || pnlData[pnlData.length - 1] !== data.pnl) {
+            // Chart data updates (Run every 5 seconds to show progression over time)
+            const now = new Date();
+            if (!window.lastChartUpdateTime) {
+                window.lastChartUpdateTime = now;
+                window.lastVolumeValue = data.volume;
+                
+                // Initial data push
+                const timeLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                pnlChart.data.datasets[0].data.push(data.pnl);
+                pnlChart.data.labels.push(timeLabel);
+                pnlChart.update();
+                
+                volumeChart.data.datasets[0].data.push(0);
+                volumeChart.data.labels.push(timeLabel);
+                volumeChart.update();
+            } else if (now - window.lastChartUpdateTime >= 5000) {
+                window.lastChartUpdateTime = now;
+                const timeLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                // PnL Line Chart
+                const pnlData = pnlChart.data.datasets[0].data;
                 pnlData.push(data.pnl);
-                pnlChart.data.labels.push("");
-                if (pnlData.length > maxDataPoints) {
+                pnlChart.data.labels.push(timeLabel);
+                if (pnlData.length > 60) { // Keep last 5 minutes of history (60 points * 5s)
                     pnlData.shift();
                     pnlChart.data.labels.shift();
                 }
                 pnlChart.update();
                 document.getElementById("chart-pnl-label").innerText = `${data.pnl >= 0 ? '+' : ''}${data.pnl.toFixed(4)} USDT`;
-            }
 
-            const volData = volumeChart.data.datasets[0].data;
-            if (volData.length === 0 || data.volume > 0) {
-                // If it increases, compute the step difference
-                const lastVol = volData.length > 0 ? volHistory[volHistory.length - 1] : 0;
-                const diff = Math.max(0, data.volume - lastVol);
-                volHistory.push(data.volume);
-                volData.push(diff);
-                volumeChart.data.labels.push("");
-                if (volData.length > 30) {
+                // Volume Bar Chart (show volume generated in this 5-second interval)
+                const volData = volumeChart.data.datasets[0].data;
+                const currentVolume = data.volume;
+                const lastVolume = window.lastVolumeValue !== undefined ? window.lastVolumeValue : currentVolume;
+                const intervalVolume = Math.max(0, currentVolume - lastVolume);
+                window.lastVolumeValue = currentVolume;
+
+                volData.push(intervalVolume);
+                volumeChart.data.labels.push(timeLabel);
+                if (volData.length > 30) { // Keep last 2.5 minutes of history
                     volData.shift();
-                    volHistory.shift();
                     volumeChart.data.labels.shift();
                 }
                 volumeChart.update();
