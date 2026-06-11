@@ -161,6 +161,8 @@ def main():
     ap.add_argument("--stop-market", action="store_true",
                     help="Model catastrophe stop as TAKER (market) instead of maker")
     ap.add_argument("--oos", action="store_true", help="Also show train/test split")
+    ap.add_argument("--walk", type=int, default=0,
+                    help="Walk-forward: split into N consecutive blocks and report each")
     a = ap.parse_args()
 
     params = MeanRevParams(lookback=a.lookback, z_in=a.z_in, z_exit=a.z_exit,
@@ -184,6 +186,18 @@ def main():
         print()
         metrics(run_backtest(bars[:mid], params, costs), "TRAIN (1st half)")
         metrics(run_backtest(bars[mid:], params, costs), "TEST  (2nd half)")
+
+    if a.walk > 1:
+        import time as _t
+        print(f"\nWalk-forward ({a.walk} consecutive blocks):")
+        block = len(bars) // a.walk
+        for k in range(a.walk):
+            seg = bars[k*block:(k+1)*block] if k < a.walk-1 else bars[k*block:]
+            if len(seg) < a.lookback + 5:
+                continue
+            d0 = _t.strftime("%Y-%m-%d", _t.gmtime(seg[0]["b"]/1000))
+            d1 = _t.strftime("%m-%d", _t.gmtime(seg[-1]["b"]/1000))
+            metrics(run_backtest(seg, params, costs), f"[{d0}->{d1}]")
 
 
 if __name__ == "__main__":

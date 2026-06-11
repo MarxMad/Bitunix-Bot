@@ -33,12 +33,18 @@ perp de Bitunix es 24/7 → comportamiento estructuralmente distinto.
 | [`03_diseno_estrategia.md`](03_diseno_estrategia.md) | Diseño de estrategia + gestión de riesgo para $20, y las 3 rutas viables |
 | [`04_backtest_eth_xlm.md`](04_backtest_eth_xlm.md) | **Ruta B**: backtest con datos REALES de Bitunix. Edge validado en XLM (reversión maker), ETH descartado |
 | [`05_implementacion.md`](05_implementacion.md) | Implementación: `meanrev_core.py`, `backtest.py`, `strategy_meanrev.py`, cómo correr dry-run/live |
+| [`06_backtest_360d.md`](06_backtest_360d.md) | ⚠️ **Re-validación a 360 días: el edge NO se sostiene (−49 %). El +18 % de 60d era espejismo de régimen. NO operar en vivo.** |
 
-## ✅ Resultado actual (Ruta B elegida): edge validado en XLMUSDT
+## 🔴 Resultado actual (CORREGIDO): el edge de XLM NO es robusto
 
-Reversión a la media en extremos (3σ) con ejecución **maker**: +18 % en 60 días
-(Sharpe 1.3), se sostiene out-of-sample y sobrevive slippage. **ETH no tiene edge.**
-Detalle y caveats en [`04_backtest_eth_xlm.md`](04_backtest_eth_xlm.md).
+El backtest de 60 días daba +18 % (Sharpe 1.3), pero la **re-validación a 360 días**
+([`06`](06_backtest_360d.md)) lo desmiente: **−49 % neto**, solo 3 de 12 bloques
+mensuales positivos. El +18 % fue un **espejismo de régimen** (la ventana de 60d
+cayó justo en el tramo favorable).
+
+➡️ **La estrategia, tal cual, NO es desplegable.** La infraestructura (backtester,
+dashboard, pipeline de datos) sigue siendo valiosa para iterar; el edge, no.
+ETH tampoco tenía edge ([`04`](04_backtest_eth_xlm.md)).
 
 ## Scripts
 
