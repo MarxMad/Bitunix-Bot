@@ -116,6 +116,8 @@ class InstrumentedMarketMaker(MarketMaker):
         self._sl_count   = 0
         self._last_buy_price = 0.0
         self._last_sell_price = 0.0
+        self._last_pending_check = 0.0
+        self._cached_active_orders = []
 
     def _parse_pending_orders(self, resp: dict) -> list:
         """Parse active/pending orders from the Bitunix API response structure."""
@@ -240,31 +242,34 @@ class InstrumentedMarketMaker(MarketMaker):
 
         logger.info(f"📊 {self.cfg.symbol}  mid={mid:.4f}  volume={self.total_volume:.2f}  pnl={self.realized_pnl:.4f}")
 
-        # Fetch pending orders from exchange
-        active_orders = []
+        # Fetch pending orders from exchange (throttled to run once every 9 seconds or immediately on refresh)
+        now = time.time()
         api_success = False
-        try:
-            resp = self.client.get_pending_orders(self.cfg.symbol)
-            active_orders = self._parse_pending_orders(resp)
-            api_success = True
-        except Exception as e:
-            logger.warning(f"Failed to fetch pending orders: {e}")
+        if now - self._last_pending_check >= 9.0:
+            try:
+                resp = self.client.get_pending_orders(self.cfg.symbol)
+                self._cached_active_orders = self._parse_pending_orders(resp)
+                api_success = True
+                self._last_pending_check = now
+            except Exception as e:
+                logger.warning(f"Failed to fetch pending orders: {e}")
 
         # Detect any executed fills *before* checking stops or reposting
         if api_success:
-            self._detect_fills(active_orders, mid)
+            self._detect_fills(self._cached_active_orders, mid)
 
         # Circuit breaker
         if self._check_circuit_breaker():
             self.running = False
             position = self._get_position()
-            self._update_state(mid, position, active_orders)
+            self._update_state(mid, position, self._cached_active_orders)
             return
 
         # Position + stop-loss
         position = self._get_position()
         if self._check_stop_loss(position):
             self._cancel_active_orders()
+            self._cached_active_orders = []
             self._update_state(mid, {}, [])
             return
 
@@ -275,15 +280,15 @@ class InstrumentedMarketMaker(MarketMaker):
             self._place_maker_orders(mid)
             self.last_mid_price = mid
             # Fetch active orders again since we just replaced them
-            active_orders = []
             try:
                 resp = self.client.get_pending_orders(self.cfg.symbol)
-                active_orders = self._parse_pending_orders(resp)
+                self._cached_active_orders = self._parse_pending_orders(resp)
+                self._last_pending_check = time.time()
             except Exception:
                 pass
 
         # Update shared state every step
-        self._update_state(mid, position, active_orders)
+        self._update_state(mid, position, self._cached_active_orders)
 
     def run(self):
         """Run loop that respects the stop_event."""
@@ -319,6 +324,8 @@ class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMak
         self._sl_count   = 0
         self._last_buy_price = 0.0
         self._last_sell_price = 0.0
+        self._last_pending_check = 0.0
+        self._cached_active_orders = []
 
     def _update_state(self, mid: float, position: dict, active_orders: list):
         """Override to also push adaptive stats details."""
@@ -370,31 +377,34 @@ class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMak
 
         logger.info(f"📊 [ADAPTIVE] {self.cfg.symbol}  mid={mid:.4f}  volume={self.total_volume:.2f}  pnl={self.realized_pnl:.4f}")
 
-        # Fetch active orders
-        active_orders = []
+        # Fetch active orders (throttled to run once every 9 seconds or immediately on refresh)
+        now = time.time()
         api_success = False
-        try:
-            resp = self.client.get_pending_orders(self.cfg.symbol)
-            active_orders = self._parse_pending_orders(resp)
-            api_success = True
-        except Exception as e:
-            logger.warning(f"Failed to fetch pending orders: {e}")
+        if now - self._last_pending_check >= 9.0:
+            try:
+                resp = self.client.get_pending_orders(self.cfg.symbol)
+                self._cached_active_orders = self._parse_pending_orders(resp)
+                api_success = True
+                self._last_pending_check = now
+            except Exception as e:
+                logger.warning(f"Failed to fetch pending orders: {e}")
 
         # Detect executed fills
         if api_success:
-            self._detect_fills(active_orders, mid)
+            self._detect_fills(self._cached_active_orders, mid)
 
         # Circuit breaker
         if self._check_circuit_breaker():
             self.running = False
             position = self._get_position()
-            self._update_state(mid, position, active_orders)
+            self._update_state(mid, position, self._cached_active_orders)
             return
 
         # Position + stop-loss
         position = self._get_position()
         if self._check_stop_loss(position):
             self._cancel_active_orders()
+            self._cached_active_orders = []
             self._update_state(mid, {}, [])
             return
 
@@ -408,16 +418,16 @@ class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMak
             self._cancel_active_orders()
             self._place_maker_orders(mid)
             self.last_mid_price = mid
-            # Fetch active orders again
-            active_orders = []
+            # Fetch active orders again since we just replaced them
             try:
                 resp = self.client.get_pending_orders(self.cfg.symbol)
-                active_orders = self._parse_pending_orders(resp)
+                self._cached_active_orders = self._parse_pending_orders(resp)
+                self._last_pending_check = time.time()
             except Exception:
                 pass
 
         # Update state
-        self._update_state(mid, position, active_orders)
+        self._update_state(mid, position, self._cached_active_orders)
 
 
 # ─── FastAPI app ──────────────────────────────────────────────────────────────
