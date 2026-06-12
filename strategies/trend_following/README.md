@@ -19,11 +19,32 @@ de tendencia (slope/ADX), salida por stop ATR.
   Entradas a mercado → fee **taker** (0.06%).
 
 ## Estado
-🟢 **Primera en optimizarse.** Backtester vectorizado con barrido de parámetros y
-split train/test. Ver `backtest.py` y `core.py`.
+🟢 **Optimizada, pulida y ejecutable.** Backtester vectorizado + estrategia en vivo
+(dry-run) + dashboard dedicado. Resultados y config validada en
+[`RESULTS.md`](RESULTS.md). Edge robusto en XLM, no en ETH.
 
+## Archivos
+| Archivo | Rol |
+|---|---|
+| `core.py` | Señal vectorizada (`compute_position`) + `vol_target` (sizing) |
+| `backtest.py` | Backtester + `--optimize` (barrido con train/test) |
+| `strategy_trend.py` | Estrategia en vivo + dry-run (rebalanceo a posición objetivo) |
+| `trend_server.py` + `dashboard/trend.html` | Dashboard dedicado (puerto 8002) |
+| `RESULTS.md` | Resultados 360d + polish (vol-target) |
+
+## Uso
 ```bash
-# Optimizar (barrido con train/test honesto)
+# 1. Optimizar / re-validar
+.venv/bin/python strategies/trend_following/backtest.py <DATA.csv> --optimize
+
+# 2. Backtest de la config pulida
 .venv/bin/python strategies/trend_following/backtest.py \
-  strategies/mean_reversion/research/data/ETHUSDT_1m.csv --optimize
+  strategies/mean_reversion/research/data/XLMUSDT_1m.csv \
+  --tf 1h --fast 12 --slow 100 --min-sep 0.01 --vol-target 0.006 --max-lev 1.5
+
+# 3. Dashboard en vivo (dry-run) — puerto 8002
+.venv/bin/python strategies/trend_following/trend_server.py   # abrir http://localhost:8002
+
+# 4. CLI headless
+.venv/bin/python bot.py --trend --symbol XLMUSDT --dry-run
 ```

@@ -31,6 +31,8 @@ from strategies.market_maker.strategy_market_maker import MarketMaker, MarketMak
 from strategies.market_maker.strategy_adaptive import AdaptiveMarketMaker, AdaptiveConfig
 from strategies.mean_reversion.strategy_meanrev import MeanReversionMaker, MeanRevConfig
 from strategies.mean_reversion.meanrev_core import MeanRevParams
+from strategies.trend_following.strategy_trend import TrendFollower, TrendConfig
+from strategies.trend_following.core import TrendParams
 
 # ─── Coloured logging ─────────────────────────────────────────────────────────
 
@@ -104,10 +106,14 @@ def parse_args():
     parser.add_argument("--log-level",     default="INFO",      help="Log level: DEBUG, INFO, WARNING, ERROR")
     parser.add_argument("--dry-run",       action="store_true", help="Dry run: fetch market data but do NOT place orders")
     parser.add_argument("--adaptive",      action="store_true", help="Use adaptive market making strategy with optimizations")
-    parser.add_argument("--meanrev",       action="store_true", help="Use the validated XLM mean-reversion maker strategy")
+    parser.add_argument("--meanrev",       action="store_true", help="Use the XLM mean-reversion maker strategy (note: failed 360d re-validation)")
     parser.add_argument("--interval",      default="5m",        help="[meanrev] signal timeframe (e.g. 5m)")
     parser.add_argument("--z-in",          default=3.0,         type=float, help="[meanrev] entry z-score (>=3 recommended)")
     parser.add_argument("--z-exit",        default=0.5,         type=float, help="[meanrev] exit z-score band")
+    parser.add_argument("--trend",         action="store_true", help="Use the trend-following strategy (XLM 1h 12/100 + vol-target)")
+    parser.add_argument("--fast",          default=12,          type=int,   help="[trend] fast EMA span")
+    parser.add_argument("--slow",          default=100,         type=int,   help="[trend] slow EMA span")
+    parser.add_argument("--vol-target",    default=0.006,       type=float, help="[trend] per-bar vol target for sizing (0=off)")
     return parser.parse_args()
 
 
@@ -188,6 +194,28 @@ def main():
         )
         try:
             MeanReversionMaker(client, mr_cfg).run()
+        except KeyboardInterrupt:
+            log.info("Stopped by user.")
+        finally:
+            log.info("Bot shutdown complete.")
+        return
+
+    # ── Trend-following strategy (own dry-run handling) ─────────────────────
+    if args.trend:
+        log.info("🚀 Using TREND-FOLLOWING strategy (validated robust on XLMUSDT).")
+        interval = args.interval if args.interval != "5m" else "1h"
+        tf_cfg = TrendConfig(
+            symbol=args.symbol,
+            micro_tf=interval,
+            params=TrendParams(tf=interval, fast=args.fast, slow=args.slow,
+                               min_sep=0.01, allow_short=True),
+            vt_target=args.vol_target,
+            base_qty=float(args.qty) if float(args.qty) >= 1 else 80,
+            leverage=args.leverage,
+            dry_run=args.dry_run,
+        )
+        try:
+            TrendFollower(client, tf_cfg).run()
         except KeyboardInterrupt:
             log.info("Stopped by user.")
         finally:

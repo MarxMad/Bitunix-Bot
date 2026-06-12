@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bitunix · Trend-Following XLM</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#08090d; --bg-grad:radial-gradient(circle at 50% 0%, #0b1c16 0%, #07080b 70%);
+    --card:rgba(13,16,23,.78); --border:rgba(2,192,118,.10); --border2:rgba(2,192,118,.28);
+    --text:#f1f5f9; --muted:#64748b; --dark:#475569;
+    --green:#02c076; --green-glow:rgba(2,192,118,.35); --green-bg:rgba(2,192,118,.08);
+    --red:#ff3366; --red-bg:rgba(255,51,102,.08);
+    --amber:#ff6b35; --amber-bg:rgba(255,107,53,.08); --info:#00f0ff; --purple:#bd93f9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Outfit',sans-serif;background:var(--bg);background-image:var(--bg-grad);
+       background-attachment:fixed;color:var(--text);min-height:100vh;padding:24px;font-size:14px}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .wrap{max-width:1280px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--green),#00e577);
+        display:grid;place-items:center;font-weight:800;color:#04130d;font-size:20px;box-shadow:0 0 24px var(--green-glow)}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:12px}
+  .pill{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--border2)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--dark)}
+  .dot.on{background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 1.6s infinite}
+  .dot.off{background:var(--red)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .grid{display:grid;gap:16px}.cards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;backdrop-filter:blur(18px)}
+  .card .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+  .card .val{font-size:26px;font-weight:700;margin-top:8px;letter-spacing:-.5px}
+  .card .hint{color:var(--dark);font-size:11px;margin-top:4px}
+  .pos{color:var(--green)}.neg{color:var(--red)}.mut{color:var(--muted)}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;backdrop-filter:blur(18px)}
+  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:14px;font-weight:600}
+  .row2{grid-template-columns:1.6fr 1fr}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--muted);font-weight:600}
+  .field input,.field select{background:#0b0e14;border:1px solid var(--border2);color:var(--text);border-radius:10px;padding:9px 12px;font-family:'JetBrains Mono',monospace;width:100px;font-size:13px}
+  .btn{border:none;border-radius:10px;padding:11px 22px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;transition:.15s}
+  .btn-start{background:var(--green);color:#04130d}.btn-start:hover{background:#00e577;box-shadow:0 0 18px var(--green-glow)}
+  .btn-stop{background:var(--red);color:#fff}.btn-stop:hover{background:#ff1a53}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  canvas{width:100%!important}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--border)}
+  td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+  .badge{font-size:14px;font-weight:800;padding:5px 14px;border-radius:8px}
+  .badge.long{background:var(--green-bg);color:var(--green)}.badge.short{background:var(--red-bg);color:var(--red)}
+  .badge.flat{background:rgba(100,116,139,.12);color:var(--muted)}
+  .log{font-family:'JetBrains Mono',monospace;font-size:11px;max-height:230px;overflow-y:auto;line-height:1.7}
+  .log .ln{padding:3px 10px;border-left:2px solid var(--green);margin-bottom:3px;color:#cbd5e1;background:rgba(255,255,255,.015)}
+  .log .ln.WARNING{border-color:var(--amber);color:#fde047}
+  .log .ln.ERROR,.log .ln.CRITICAL{border-color:var(--red);color:#fca5a5}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:10px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}.lg{width:18px;height:0;border-top:2px solid}
+  .mt{margin-top:16px}.small{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">B</div>
+      <div>
+        <h1>Trend-Following · <span style="color:var(--green)">XLM</span></h1>
+        <div class="sub">Momentum EMA con volatility targeting · Bitunix Futures · puerto 8002</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="pill"><span class="dot" id="modeDot"></span><span id="modeTxt">—</span></span>
+      <span class="pill"><span class="dot" id="connDot"></span><span id="connTxt">conectando…</span></span>
+    </div>
+  </header>
+
+  <div class="panel">
+    <h2>Control</h2>
+    <div class="controls">
+      <div class="field"><label>Símbolo</label><input id="symbol" value="XLMUSDT"/></div>
+      <div class="field"><label>Timeframe</label><select id="tf"><option>1h</option><option>4h</option><option>15m</option></select></div>
+      <div class="field"><label>EMA rápida</label><input id="fast" class="mono" value="12"/></div>
+      <div class="field"><label>EMA lenta</label><input id="slow" class="mono" value="100"/></div>
+      <div class="field"><label>min_sep</label><input id="minsep" class="mono" value="0.01"/></div>
+      <div class="field"><label>vol-target</label><input id="vt" class="mono" value="0.006"/></div>
+      <div class="field"><label>Qty (≥80)</label><input id="qty" class="mono" value="80"/></div>
+      <div class="field"><label>Modo</label><div style="height:38px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="dryrun" checked/><span class="small">Dry-run</span></div></div>
+      <button class="btn btn-start" id="startBtn" onclick="startBot()">▶ Iniciar</button>
+      <button class="btn btn-stop" id="stopBtn" onclick="stopBot()" disabled>■ Detener</button>
+    </div>
+  </div>
+
+  <div class="grid cards mt">
+    <div class="card"><div class="label">Señal</div><div class="val"><span class="badge flat" id="signal">FLAT</span></div><div class="hint" id="sigHint">EMA cross</div></div>
+    <div class="card"><div class="label">Posición / Target</div><div class="val mono" id="position">0</div><div class="hint" id="posHint">target 0</div></div>
+    <div class="card"><div class="label">PnL Realizado</div><div class="val mono" id="pnl">$0.00</div><div class="hint" id="pnlHint">sesión</div></div>
+    <div class="card"><div class="label">PnL No Realizado</div><div class="val mono" id="upnl">$0.00</div><div class="hint" id="entryHint">sin posición</div></div>
+    <div class="card"><div class="label">Trades</div><div class="val mono" id="trades">0</div><div class="hint" id="dayHint">día $0</div></div>
+    <div class="card"><div class="label">Precio</div><div class="val mono" id="price">—</div><div class="hint" id="uptime">uptime 0s</div></div>
+  </div>
+
+  <div class="grid row2 mt">
+    <div class="panel">
+      <h2>Precio + EMAs (señal de tendencia)</h2>
+      <canvas id="pxChart" height="240"></canvas>
+      <div class="legend">
+        <span><span class="lg" style="border-color:#cbd5e1"></span>precio</span>
+        <span><span class="lg" style="border-color:var(--green)"></span>EMA rápida</span>
+        <span><span class="lg" style="border-color:var(--amber)"></span>EMA lenta</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Curva de PnL (USDT)</h2>
+      <canvas id="eqChart" height="240"></canvas>
+    </div>
+  </div>
+
+  <div class="grid row2 mt">
+    <div class="panel">
+      <h2>Historial de trades</h2>
+      <div style="max-height:280px;overflow-y:auto">
+        <table><thead><tr><th>#</th><th>Hora</th><th>Precio</th><th>PnL</th></tr></thead>
+        <tbody id="tradesBody"><tr><td colspan="4" class="mut" style="text-align:center;padding:20px">Sin trades aún</td></tr></tbody></table>
+      </div>
+    </div>
+    <div class="panel"><h2>Log en vivo</h2><div class="log" id="log"></div></div>
+  </div>
+
+  <div class="small" style="text-align:center;margin-top:22px;color:var(--dark)">
+    XLM 1h 12/100 + vol-target: backtest 360d +85% / Sharpe 1.34 / maxDD −37% · ver strategies/trend_following/RESULTS.md · Empieza en dry-run.
+  </div>
+</div>
+
+<script>
+const API = location.origin;
+const WSURL = location.origin.replace(/^http/,'ws') + '/ws';
+let pxChart, eqChart;
+function fmtUsd(v){return (v>=0?'+':'')+'$'+Math.abs(v).toFixed(4)}
+function cls(v){return v>0?'pos':v<0?'neg':'mut'}
+
+function initCharts(){
+  const grid={color:'rgba(255,255,255,.04)'}, tick={color:'#64748b',font:{family:'JetBrains Mono'}};
+  pxChart=new Chart(document.getElementById('pxChart'),{type:'line',
+    data:{labels:[],datasets:[
+      {label:'price',data:[],borderColor:'#cbd5e1',borderWidth:1.5,tension:.2,pointRadius:0},
+      {label:'ef',data:[],borderColor:'#02c076',borderWidth:2,tension:.2,pointRadius:0},
+      {label:'es',data:[],borderColor:'#ff6b35',borderWidth:2,tension:.2,pointRadius:0}]},
+    options:{responsive:true,animation:false,plugins:{legend:{display:false}},
+      scales:{x:{grid,ticks:{...tick,maxTicksLimit:8}},y:{grid,ticks:tick}}}});
+  eqChart=new Chart(document.getElementById('eqChart'),{type:'line',
+    data:{labels:[],datasets:[{label:'PnL',data:[],borderColor:'#02c076',backgroundColor:'rgba(2,192,118,.10)',borderWidth:2,tension:.2,pointRadius:0,fill:true}]},
+    options:{responsive:true,animation:false,plugins:{legend:{display:false}},
+      scales:{x:{grid,ticks:{...tick,maxTicksLimit:8}},y:{grid,ticks:tick}}}});
+}
+
+function render(s){
+  document.getElementById('connDot').className='dot on';
+  document.getElementById('connTxt').textContent='conectado';
+  document.getElementById('modeTxt').textContent=s.running?(s.mode+' · activo'):'detenido';
+  document.getElementById('modeDot').className='dot '+(s.running?'on':'off');
+  document.getElementById('startBtn').disabled=s.running;
+  document.getElementById('stopBtn').disabled=!s.running;
+
+  const sg=document.getElementById('signal');
+  const dir = s.signal>0?'long':s.signal<0?'short':'flat';
+  sg.className='badge '+dir; sg.textContent={long:'LONG',short:'SHORT',flat:'FLAT'}[dir];
+  document.getElementById('sigHint').textContent='EMA '+s.fast+'/'+s.slow;
+  const p=document.getElementById('position'); p.textContent=(s.position>0?'+':'')+s.position;
+  p.className='val mono '+cls(s.position);
+  document.getElementById('posHint').textContent='target '+(s.target>0?'+':'')+s.target;
+  const pnl=document.getElementById('pnl'); pnl.textContent=fmtUsd(s.realized_pnl); pnl.className='val mono '+cls(s.realized_pnl);
+  const up=document.getElementById('upnl'); up.textContent=fmtUsd(s.unrealized); up.className='val mono '+cls(s.unrealized);
+  document.getElementById('entryHint').textContent=s.position?('entrada '+s.entry):'sin posición';
+  document.getElementById('trades').textContent=s.trade_count;
+  document.getElementById('dayHint').textContent='día '+fmtUsd(s.daily_pnl);
+  document.getElementById('price').textContent=s.price||'—';
+  document.getElementById('uptime').textContent='uptime '+s.uptime_seconds+'s';
+
+  pxChart.data.labels=s.price_history.map(p=>p.t);
+  pxChart.data.datasets[0].data=s.price_history.map(p=>p.close);
+  pxChart.data.datasets[1].data=s.price_history.map(p=>p.ef);
+  pxChart.data.datasets[2].data=s.price_history.map(p=>p.es);
+  pxChart.update('none');
+  eqChart.data.labels=s.equity_curve.map(p=>'#'+p.n);
+  eqChart.data.datasets[0].data=s.equity_curve.map(p=>p.equity);
+  eqChart.update('none');
+
+  const tb=document.getElementById('tradesBody');
+  if(s.trades.length){tb.innerHTML=s.trades.slice().reverse().map(t=>`<tr>
+    <td class="mono">${t.n}</td><td class="mono mut">${t.t}</td>
+    <td class="mono">${t.price}</td><td class="mono ${cls(t.pnl)}">${fmtUsd(t.pnl)}</td></tr>`).join('');}
+
+  const lg=document.getElementById('log');
+  lg.innerHTML=s.log_lines.slice(-40).map(l=>{let c=l.includes('WARNING')?'WARNING':(l.includes('ERROR')||l.includes('CRITICAL'))?'ERROR':'';
+    return `<div class="ln ${c}">${l.replace(/</g,'&lt;')}</div>`;}).join('');
+  lg.scrollTop=lg.scrollHeight;
+}
+
+async function startBot(){
+  const body={symbol:symbol.value,tf:tf.value,fast:+fast.value,slow:+slow.value,
+    min_sep:+minsep.value,vt_target:+vt.value,base_qty:+qty.value,dry_run:dryrun.checked};
+  const r=await fetch(API+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json(); if(!j.ok) alert(j.detail);
+}
+async function stopBot(){await fetch(API+'/stop',{method:'POST'});}
+function connect(){const ws=new WebSocket(WSURL);ws.onmessage=e=>render(JSON.parse(e.data));
+  ws.onclose=()=>{document.getElementById('connDot').className='dot off';
+    document.getElementById('connTxt').textContent='reconectando…';setTimeout(connect,2000);};}
+initCharts();connect();
+</script>
+</body>
+</html>
