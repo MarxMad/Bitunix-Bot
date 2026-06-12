@@ -179,7 +179,7 @@ class InstrumentedMarketMaker(MarketMaker):
         pos_side   = position.get("side", "FLAT") if position else "FLAT"
         pos_qty    = float(position.get("qty", 0))    if position else 0.0
         entry_px   = float(position.get("avgOpenPrice", 0)) if position else 0.0
-        unreal_pnl = float(position.get("unrealizedPnl", 0)) if position else 0.0
+        unreal_pnl = float(position.get("unrealizedPNL", position.get("unrealizedPnl", 0)) or 0) if position else 0.0
         margin     = float(position.get("margin", 1))  if position else 1.0
 
         max_loss = self.cfg.max_total_loss_usdt

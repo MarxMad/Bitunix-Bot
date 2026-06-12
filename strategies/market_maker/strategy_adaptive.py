@@ -549,7 +549,7 @@ class AdaptiveMarketMaker:
         """
         if not position:
             return False
-        unrealized_pnl = float(position.get("unrealizedPnl", 0))
+        unrealized_pnl = float(position.get("unrealizedPNL", position.get("unrealizedPnl", 0)) or 0)
         margin = float(position.get("margin", 1))
         if margin == 0:
             return False
