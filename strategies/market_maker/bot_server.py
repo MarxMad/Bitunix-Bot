@@ -570,7 +570,7 @@ async def websocket_endpoint(ws: WebSocket):
             snapshot["log_lines"] = payload.get("log_lines", [])
             await ws.send_text(json.dumps(snapshot, default=str))
             await asyncio.sleep(1.0)
-    except (WebSocketDisconnect, Exception):
+    except (WebSocketDisconnect, asyncio.CancelledError, Exception):
         pass
     finally:
         _ws_clients.discard(ws)
