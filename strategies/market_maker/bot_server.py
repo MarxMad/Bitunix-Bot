@@ -117,6 +117,33 @@ class InstrumentedMarketMaker(MarketMaker):
         self._last_buy_price = 0.0
         self._last_sell_price = 0.0
 
+    def _parse_pending_orders(self, resp: dict) -> list:
+        """Parse active/pending orders from the Bitunix API response structure."""
+        if not resp or not isinstance(resp, dict):
+            return []
+        data = resp.get("data")
+        if isinstance(data, dict):
+            orders = data.get("orderList", []) or []
+        elif isinstance(data, list):
+            orders = data
+        else:
+            orders = []
+        
+        active_orders = []
+        for o in orders:
+            if isinstance(o, dict):
+                try:
+                    price_val = float(o.get("price", 0) or 0)
+                except (ValueError, TypeError):
+                    price_val = 0.0
+                active_orders.append({
+                    "id":    o.get("orderId", ""),
+                    "side":  o.get("side", ""),
+                    "price": price_val,
+                    "qty":   o.get("qty", ""),
+                })
+        return active_orders
+
     def _detect_fills(self, active_orders: list, mid: float):
         """Compare current pending orders on the exchange with our tracked active orders to detect fills."""
         current_ids = {o["id"] for o in active_orders}
@@ -218,14 +245,7 @@ class InstrumentedMarketMaker(MarketMaker):
         api_success = False
         try:
             resp = self.client.get_pending_orders(self.cfg.symbol)
-            orders = resp.get("data", []) or []
-            for o in orders:
-                active_orders.append({
-                    "id":    o.get("orderId", ""),
-                    "side":  o.get("side", ""),
-                    "price": float(o.get("price", 0)),
-                    "qty":   o.get("qty", ""),
-                })
+            active_orders = self._parse_pending_orders(resp)
             api_success = True
         except Exception as e:
             logger.warning(f"Failed to fetch pending orders: {e}")
@@ -258,14 +278,7 @@ class InstrumentedMarketMaker(MarketMaker):
             active_orders = []
             try:
                 resp = self.client.get_pending_orders(self.cfg.symbol)
-                orders = resp.get("data", []) or []
-                for o in orders:
-                    active_orders.append({
-                        "id":    o.get("orderId", ""),
-                        "side":  o.get("side", ""),
-                        "price": float(o.get("price", 0)),
-                        "qty":   o.get("qty", ""),
-                    })
+                active_orders = self._parse_pending_orders(resp)
             except Exception:
                 pass
 
@@ -362,14 +375,7 @@ class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMak
         api_success = False
         try:
             resp = self.client.get_pending_orders(self.cfg.symbol)
-            orders = resp.get("data", []) or []
-            for o in orders:
-                active_orders.append({
-                    "id":    o.get("orderId", ""),
-                    "side":  o.get("side", ""),
-                    "price": float(o.get("price", 0)),
-                    "qty":   o.get("qty", ""),
-                })
+            active_orders = self._parse_pending_orders(resp)
             api_success = True
         except Exception as e:
             logger.warning(f"Failed to fetch pending orders: {e}")
@@ -406,14 +412,7 @@ class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMak
             active_orders = []
             try:
                 resp = self.client.get_pending_orders(self.cfg.symbol)
-                orders = resp.get("data", []) or []
-                for o in orders:
-                    active_orders.append({
-                        "id":    o.get("orderId", ""),
-                        "side":  o.get("side", ""),
-                        "price": float(o.get("price", 0)),
-                        "qty":   o.get("qty", ""),
-                    })
+                active_orders = self._parse_pending_orders(resp)
             except Exception:
                 pass
 
