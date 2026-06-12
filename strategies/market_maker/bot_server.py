@@ -215,6 +215,7 @@ class InstrumentedMarketMaker(MarketMaker):
 
         # Fetch pending orders from exchange
         active_orders = []
+        api_success = False
         try:
             resp = self.client.get_pending_orders(self.cfg.symbol)
             orders = resp.get("data", []) or []
@@ -225,11 +226,13 @@ class InstrumentedMarketMaker(MarketMaker):
                     "price": float(o.get("price", 0)),
                     "qty":   o.get("qty", ""),
                 })
-        except Exception:
-            pass
+            api_success = True
+        except Exception as e:
+            logger.warning(f"Failed to fetch pending orders: {e}")
 
         # Detect any executed fills *before* checking stops or reposting
-        self._detect_fills(active_orders, mid)
+        if api_success:
+            self._detect_fills(active_orders, mid)
 
         # Circuit breaker
         if self._check_circuit_breaker():
@@ -356,6 +359,7 @@ class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMak
 
         # Fetch active orders
         active_orders = []
+        api_success = False
         try:
             resp = self.client.get_pending_orders(self.cfg.symbol)
             orders = resp.get("data", []) or []
@@ -366,11 +370,13 @@ class InstrumentedAdaptiveMarketMaker(InstrumentedMarketMaker, AdaptiveMarketMak
                     "price": float(o.get("price", 0)),
                     "qty":   o.get("qty", ""),
                 })
-        except Exception:
-            pass
+            api_success = True
+        except Exception as e:
+            logger.warning(f"Failed to fetch pending orders: {e}")
 
         # Detect executed fills
-        self._detect_fills(active_orders, mid)
+        if api_success:
+            self._detect_fills(active_orders, mid)
 
         # Circuit breaker
         if self._check_circuit_breaker():
